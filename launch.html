@@ -1,13 +1,142 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Redirection automatique immédiate (0 seconde) vers le sous-dossier src -->
-    <meta http-equiv="refresh" content="0; url=src/index.html">
-    <title>Redirection...</title>
+    <meta name="theme-color" content="#171717">
+    <title>Installer a:b</title>
+    <style>
+        :root{color-scheme:dark;--fg:#f4f4f4;--mut:#9a9a9e;--win:#2a2a2c;--ct:#171717;--field:#3a3a3c;--bd:rgba(255,255,255,.2);--accent:#b5e8d0;--error:#ff8c82}
+        *{box-sizing:border-box}
+        body{min-height:100vh;margin:0;padding:32px;display:grid;place-items:center;background-color:#111;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px),radial-gradient(ellipse at 18% 12%,rgba(107,138,128,.2),transparent 42%),radial-gradient(ellipse at 86% 88%,rgba(133,111,81,.15),transparent 39%);background-size:36px 36px,36px 36px,auto,auto;color:var(--fg);font-family:"Open Sans","Segoe UI",system-ui,sans-serif}
+        main{width:min(100%,680px);overflow:hidden;border:1px solid var(--bd);border-radius:12px;background:var(--win);box-shadow:0 24px 80px rgba(0,0,0,.48);animation:appear .45s ease-out both}
+        .titlebar{height:42px;padding:0 16px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--bd);color:var(--mut);font-size:12px}
+        .lights{display:flex;gap:6px;margin-right:4px}.lights i{width:9px;height:9px;border-radius:50%;background:#ff6258}.lights i:nth-child(2){background:#ffbd44}.lights i:nth-child(3){background:#35c759}
+        .content{padding:clamp(25px,6vw,52px)}
+        .brand{display:flex;align-items:center;gap:16px;margin-bottom:30px}
+        .mark{width:58px;height:58px;display:grid;place-items:center;border:1px solid var(--bd);border-radius:15px;background:#1e1e1e;font-size:27px;font-weight:650}
+        h1{margin:0;font-size:clamp(28px,6vw,40px);font-weight:550}
+        .sub{margin:4px 0 0;color:var(--mut);font-size:13px}
+        .rule{height:1px;margin:26px 0;background:var(--bd)}
+        .destination{display:flex;justify-content:space-between;gap:18px;align-items:center;font-size:13px}
+        .destination strong{font-weight:550}.destination span{color:var(--mut)}
+        .folder{margin-top:8px;color:var(--accent);font-size:13px}
+        .actions{display:flex;align-items:center;gap:12px;margin-top:26px}
+        button{min-height:40px;padding:0 17px;border:0;border-radius:8px;background:var(--fg);color:#171717;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .15s,transform .15s}
+        button:hover:not(:disabled){filter:brightness(.88)}button:active:not(:disabled){transform:scale(.98)}button:disabled{opacity:.45;cursor:default}
+        .status{min-height:42px;margin-top:22px;color:var(--mut);font-size:12px;line-height:1.6}
+        .status strong{color:var(--fg);font-weight:550}.status.error{color:var(--error)}
+        .track{height:3px;margin-top:13px;overflow:hidden;background:rgba(255,255,255,.1)}
+        .track[hidden]{display:none}.bar{width:0;height:100%;background:var(--accent);transition:width .2s ease}
+        .foot{margin-top:26px;color:var(--mut);font-size:11px;line-height:1.6}
+        @keyframes appear{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @media(max-width:520px){body{padding:14px}.content{padding:26px 21px}.destination{align-items:flex-start;flex-direction:column;gap:5px}.actions{align-items:stretch;flex-direction:column}button{width:100%}}
+        @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+    </style>
 </head>
 <body>
-    <p>Redirection en cours... Si la page ne se charge pas, <a href="src/index.html">cliquez ici</a>.</p>
+    <main aria-labelledby="heading">
+        <div class="titlebar"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>Centre d'installation</span></div>
+        <section class="content">
+            <div class="brand"><div class="mark" aria-hidden="true">a:b</div><div><h1 id="heading">Installer a:b</h1><p class="sub">Definitive Edition</p></div></div>
+            <div class="rule"></div>
+            <div class="destination"><strong>Emplacement</strong><span>Choisissez le dossier parent dans Fichiers</span></div>
+            <div class="folder" id="folder">Le dossier créé sera .a:b</div>
+            <div class="actions"><button id="install" type="button">Choisir un dossier et installer</button></div>
+            <div id="status" class="status" role="status" aria-live="polite">Les fichiers seront téléchargés depuis le dépôt officiel a:b.</div>
+            <div id="track" class="track" hidden><div id="bar" class="bar"></div></div>
+            <p class="foot">L'installation nécessite une connexion Internet et un navigateur compatible avec l'accès aux fichiers (Chrome ou Edge). Une fois terminée, ouvrez <strong>index.html</strong> dans le dossier .a:b.</p>
+        </section>
+    </main>
+    <script>
+        const REPOSITORY = 'MaxGuill888/a-b---Definitive-Edition';
+        const BRANCH = 'main';
+        const INSTALL_FOLDER = '.a:b';
+        const button = document.querySelector('#install');
+        const status = document.querySelector('#status');
+        const track = document.querySelector('#track');
+        const bar = document.querySelector('#bar');
+
+        function setStatus(message, kind = '') {
+            status.textContent = message;
+            status.className = `status ${kind}`;
+        }
+
+        async function getFiles() {
+            const response = await fetch(`https://api.github.com/repos/${REPOSITORY}/git/trees/${BRANCH}?recursive=1`, {
+                headers: { Accept: 'application/vnd.github+json' }
+            });
+            if (!response.ok) throw new Error(`GitHub a répondu ${response.status}.`);
+            const data = await response.json();
+            if (!Array.isArray(data.tree) || data.truncated) throw new Error('La liste des fichiers du dépôt est incomplète.');
+            return data.tree.filter(entry => entry.type === 'blob' && !entry.path.split('/').some(part => part === '.git' || part === '..'));
+        }
+
+        async function writeFile(root, path, contents) {
+            const parts = path.split('/');
+            let directory = root;
+            for (const part of parts.slice(0, -1)) directory = await directory.getDirectoryHandle(part, { create: true });
+            const file = await directory.getFileHandle(parts.at(-1), { create: true });
+            const writer = await file.createWritable();
+            try {
+                await writer.write(contents);
+                await writer.close();
+            } catch (error) {
+                await writer.abort();
+                throw error;
+            }
+        }
+
+        async function install() {
+            if (!window.showDirectoryPicker || !window.isSecureContext) {
+                setStatus('Cette page nécessite Chrome ou Edge dans un contexte sécurisé pour choisir un dossier.', 'error');
+                return;
+            }
+            button.disabled = true;
+            try {
+                const parent = await window.showDirectoryPicker({ id: 'ab-install-location', mode: 'readwrite', startIn: 'documents' });
+                setStatus('Lecture de la liste des fichiers du dépôt…');
+                track.hidden = false;
+                bar.style.width = '0%';
+                const files = await getFiles();
+                if (!files.length) throw new Error('Le dépôt ne contient aucun fichier à installer.');
+                const root = await parent.getDirectoryHandle(INSTALL_FOLDER, { create: true });
+                let completed = 0;
+                let next = 0;
+                let failure;
+                const workers = Array.from({ length: Math.min(5, files.length) }, async () => {
+                    while (next < files.length && !failure) {
+                        const file = files[next++];
+                        try {
+                            const path = file.path.split('/').map(encodeURIComponent).join('/');
+                            const response = await fetch(`https://raw.githubusercontent.com/${REPOSITORY}/${BRANCH}/${path}`);
+                            if (!response.ok) throw new Error(`Téléchargement impossible : ${file.path}`);
+                            await writeFile(root, file.path, await response.arrayBuffer());
+                            completed++;
+                            bar.style.width = `${Math.round(completed / files.length * 100)}%`;
+                            setStatus(`Installation des fichiers… ${completed} / ${files.length}`);
+                        } catch (error) {
+                            failure = error;
+                        }
+                    }
+                });
+                await Promise.all(workers);
+                if (failure) throw failure;
+                bar.style.width = '100%';
+                setStatus('Installation terminée. Ouvrez index.html dans le dossier .a:b, depuis Fichiers.');
+                document.querySelector('#folder').textContent = `Installé dans ${parent.name} / ${INSTALL_FOLDER}`;
+                button.textContent = 'Installation terminée';
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    setStatus('Sélection du dossier annulée.');
+                } else {
+                    setStatus(error.message || 'Une erreur a interrompu l’installation.', 'error');
+                }
+                button.disabled = false;
+            }
+        }
+
+        button.addEventListener('click', install);
+    </script>
 </body>
 </html>
