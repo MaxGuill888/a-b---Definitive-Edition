@@ -24,6 +24,7 @@
         .actions{display:flex;align-items:center;gap:12px;margin-top:26px}
         button{min-height:40px;padding:0 17px;border:0;border-radius:8px;background:var(--fg);color:#171717;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .15s,transform .15s}
         button:hover:not(:disabled){filter:brightness(.88)}button:active:not(:disabled){transform:scale(.98)}button:disabled{opacity:.45;cursor:default}
+        #launch{background:var(--accent)}#launch[hidden]{display:none}
         .status{min-height:42px;margin-top:22px;color:var(--mut);font-size:12px;line-height:1.6}
         .status strong{color:var(--fg);font-weight:550}.status.error{color:var(--error)}
         .track{height:3px;margin-top:13px;overflow:hidden;background:rgba(255,255,255,.1)}
@@ -42,17 +43,19 @@
             <div class="rule"></div>
             <div class="destination"><strong>Emplacement</strong><span>Choisissez le dossier parent dans Fichiers</span></div>
             <div class="folder" id="folder">Le dossier créé sera .a-b</div>
-            <div class="actions"><button id="install" type="button">Choisir un dossier et installer</button></div>
+            <div class="actions"><button id="install" type="button">Choisir un dossier et installer</button><button id="launch" type="button" hidden>Lancer a:b</button></div>
             <div id="status" class="status" role="status" aria-live="polite">Les fichiers seront téléchargés depuis le dépôt officiel a:b.</div>
             <div id="track" class="track" hidden><div id="bar" class="bar"></div></div>
-            <p class="foot">L'installation nécessite une connexion Internet et un navigateur compatible avec l'accès aux fichiers (Chrome ou Edge). Une fois terminée, ouvrez <strong>index.html</strong> dans le dossier .a-b.</p>
+            <p class="foot">L'installation nécessite une connexion Internet et un navigateur compatible avec l'accès aux fichiers (Chrome ou Edge). Le bouton de lancement ouvrira la version web publiée; l'ouverture directe du fichier installé est bloquée par le navigateur.</p>
         </section>
     </main>
     <script>
         const REPOSITORY = 'MaxGuill888/a-b---Definitive-Edition';
         const BRANCH = 'main';
         const INSTALL_FOLDER = '.a-b';
+        const LAUNCH_URL = 'https://maxguill888.github.io/a-b---Definitive-Edition/src/index.html';
         const button = document.querySelector('#install');
+        const launchButton = document.querySelector('#launch');
         const status = document.querySelector('#status');
         const track = document.querySelector('#track');
         const bar = document.querySelector('#bar');
@@ -123,9 +126,10 @@
                 await Promise.all(workers);
                 if (failure) throw failure;
                 bar.style.width = '100%';
-                setStatus('Installation terminée. Ouvrez index.html dans le dossier .a-b, depuis Fichiers.');
+                setStatus('Installation terminée. Cliquez sur « Lancer a:b » pour ouvrir le bureau.');
                 document.querySelector('#folder').textContent = `Installé dans ${parent.name} / ${INSTALL_FOLDER}`;
                 button.textContent = 'Installation terminée';
+                launchButton.hidden = false;
             } catch (error) {
                 if (error.name === 'AbortError') {
                     setStatus('Sélection du dossier annulée.');
@@ -137,6 +141,7 @@
         }
 
         button.addEventListener('click', install);
+        launchButton.addEventListener('click', () => window.open(LAUNCH_URL, '_blank', 'noopener,noreferrer'));
     </script>
 </body>
 </html>
