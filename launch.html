@@ -41,17 +41,17 @@
             <div class="brand"><div class="mark" aria-hidden="true">a:b</div><div><h1 id="heading">Installer a:b</h1><p class="sub">Definitive Edition</p></div></div>
             <div class="rule"></div>
             <div class="destination"><strong>Emplacement</strong><span>Choisissez le dossier parent dans Fichiers</span></div>
-            <div class="folder" id="folder">Le dossier créé sera .a:b</div>
+            <div class="folder" id="folder">Le dossier créé sera .a-b</div>
             <div class="actions"><button id="install" type="button">Choisir un dossier et installer</button></div>
             <div id="status" class="status" role="status" aria-live="polite">Les fichiers seront téléchargés depuis le dépôt officiel a:b.</div>
             <div id="track" class="track" hidden><div id="bar" class="bar"></div></div>
-            <p class="foot">L'installation nécessite une connexion Internet et un navigateur compatible avec l'accès aux fichiers (Chrome ou Edge). Une fois terminée, ouvrez <strong>index.html</strong> dans le dossier .a:b.</p>
+            <p class="foot">L'installation nécessite une connexion Internet et un navigateur compatible avec l'accès aux fichiers (Chrome ou Edge). Une fois terminée, ouvrez <strong>index.html</strong> dans le dossier .a-b.</p>
         </section>
     </main>
     <script>
         const REPOSITORY = 'MaxGuill888/a-b---Definitive-Edition';
         const BRANCH = 'main';
-        const INSTALL_FOLDER = '.a:b';
+        const INSTALL_FOLDER = '.a-b';
         const button = document.querySelector('#install');
         const status = document.querySelector('#status');
         const track = document.querySelector('#track');
@@ -123,7 +123,7 @@
                 await Promise.all(workers);
                 if (failure) throw failure;
                 bar.style.width = '100%';
-                setStatus('Installation terminée. Ouvrez index.html dans le dossier .a:b, depuis Fichiers.');
+                setStatus('Installation terminée. Ouvrez index.html dans le dossier .a-b, depuis Fichiers.');
                 document.querySelector('#folder').textContent = `Installé dans ${parent.name} / ${INSTALL_FOLDER}`;
                 button.textContent = 'Installation terminée';
             } catch (error) {
