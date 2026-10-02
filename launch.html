@@ -46,19 +46,21 @@
             <div class="actions"><button id="install" type="button">Choisir un dossier et installer</button><button id="launch" type="button" hidden>Lancer a:b</button></div>
             <div id="status" class="status" role="status" aria-live="polite">Les fichiers seront téléchargés depuis le dépôt officiel a:b.</div>
             <div id="track" class="track" hidden><div id="bar" class="bar"></div></div>
-            <p class="foot">L'installation nécessite une connexion Internet et un navigateur compatible avec l'accès aux fichiers (Chrome ou Edge). Le bouton de lancement ouvrira la version web publiée; l'ouverture directe du fichier installé est bloquée par le navigateur.</p>
+            <p class="foot">L'installation nécessite une connexion Internet et un navigateur compatible avec l'accès aux fichiers (Chrome ou Edge). Après l'installation, le bouton ouvre l'index téléchargé avec ses fichiers locaux.</p>
         </section>
     </main>
     <script>
         const REPOSITORY = 'MaxGuill888/a-b---Definitive-Edition';
         const BRANCH = 'main';
         const INSTALL_FOLDER = '.a-b';
-        const LAUNCH_URL = 'https://maxguill888.github.io/a-b---Definitive-Edition/src/index.html';
         const button = document.querySelector('#install');
         const launchButton = document.querySelector('#launch');
         const status = document.querySelector('#status');
         const track = document.querySelector('#track');
         const bar = document.querySelector('#bar');
+        let installedIndexHandle = null;
+        let installedRootHandle = null;
+        let installedFiles = [];
 
         function setStatus(message, kind = '') {
             status.textContent = message;
@@ -125,6 +127,10 @@
                 });
                 await Promise.all(workers);
                 if (failure) throw failure;
+                const sourceDirectory = await root.getDirectoryHandle('src');
+                installedIndexHandle = await sourceDirectory.getFileHandle('index.html');
+                installedRootHandle = root;
+                installedFiles = files;
                 bar.style.width = '100%';
                 setStatus('Installation terminée. Cliquez sur « Lancer a:b » pour ouvrir le bureau.');
                 document.querySelector('#folder').textContent = `Installé dans ${parent.name} / ${INSTALL_FOLDER}`;
@@ -141,7 +147,47 @@
         }
 
         button.addEventListener('click', install);
-        launchButton.addEventListener('click', () => window.open(LAUNCH_URL, '_blank', 'noopener,noreferrer'));
+        launchButton.addEventListener('click', () => {
+            if (!installedIndexHandle || !installedRootHandle) {
+                setStatus('Installez a:b avant de le lancer.', 'error');
+                return;
+            }
+            const tab = window.open('about:blank', '_blank');
+            if (!tab) {
+                setStatus('Autorisez les fenêtres pop-up pour lancer a:b.', 'error');
+                return;
+            }
+            tab.opener = null;
+            (async () => {
+                try {
+                    const localUrls = {};
+                    const mimeTypes = { html: 'text/html', svg: 'image/svg+xml', json: 'application/json', css: 'text/css', js: 'text/javascript', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', ico: 'image/x-icon' };
+                    for (const entry of installedFiles) {
+                        const parts = entry.path.split('/');
+                        let directory = installedRootHandle;
+                        for (const part of parts.slice(0, -1)) directory = await directory.getDirectoryHandle(part);
+                        const handle = await directory.getFileHandle(parts.at(-1));
+                        const file = await handle.getFile();
+                        const extension = parts.at(-1).split('.').pop().toLowerCase();
+                        const type = mimeTypes[extension] || 'application/octet-stream';
+                        localUrls[entry.path] = URL.createObjectURL(new Blob([file], { type }));
+                    }
+                    const file = await installedIndexHandle.getFile();
+                    let html = await file.text();
+                    html = html.replace(/const ROOT=.*?;\n/, "const ROOT='';\n");
+                    html = html.replace('fetch(u).then', 'fetch(window.__abLocalUrl(u)).then');
+                    html = html.replace('if(a.def){f.src=a.src;', 'if(a.def){f.src=window.__abLocalUrl(a.src);');
+                    html = html.replace('url:p=>new URL(ROOT+p,location.href).href', 'url:p=>window.__abLocalUrl(ROOT+p)');
+                    const localBootstrap = `<script>window.__abLocalFiles=${JSON.stringify(localUrls)};window.__abLocalUrl=function(value){if(typeof value!=="string")return value;var key=value.indexOf("src/")===0?value:value.indexOf("apps/")===0?"src/"+value:null;return key&&window.__abLocalFiles[key]?window.__abLocalFiles[key]:value};var originalFetch=window.fetch.bind(window);window.fetch=function(input,...args){var value=typeof input==="string"?input:input.url;return originalFetch(window.__abLocalUrl(value),...args)};<\/script>`;
+                    html = html.replace('<script>', `${localBootstrap}<script>`);
+                    const localIndex = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+                    tab.location.href = localIndex;
+                } catch (error) {
+                    tab.close();
+                    setStatus(error.message || 'Impossible d’ouvrir l’index installé.', 'error');
+                }
+            })();
+        });
     </script>
 </body>
 </html>
