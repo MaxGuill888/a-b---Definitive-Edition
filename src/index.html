@@ -57,6 +57,7 @@ button.tile:active{transform:scale(.95)}
 .zp{position:absolute;top:28px;right:8px;width:250px;max-height:60%;z-index:5;background:var(--ct);border:1px solid var(--bd);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 24px rgba(0,0,0,.4)}
 .zp[hidden]{display:none}
 .zp input{background:var(--field);border:0;border-radius:8px;color:var(--fg);padding:6px 8px;font:inherit;font-size:11.5px;outline:0;user-select:text}
+.zl h4{font-size:10px;color:var(--mut);margin:4px 6px 2px;font-weight:600}
 .zl{overflow:auto;display:flex;flex-direction:column}
 .zl div{padding:4px 6px;border-radius:6px;cursor:pointer;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.zl div:hover{background:var(--hov)}
 .toast{position:fixed;left:50%;bottom:6vh;transform:translateX(-50%);zoom:var(--z);max-width:60vw;background:var(--fg);color:var(--ct);padding:8px 14px;border-radius:12px;font-size:12px;z-index:10000;text-align:center}
@@ -159,7 +160,7 @@ function renderNP(){$('#nl').innerHTML=notes.length?notes.map(n=>`<div>${esc(n.t
 function toggleNP(){const p=$('#np');p.hidden=!p.hidden;if(!p.hidden){unread=0;renderNP();render()}}
 $('#clr').onclick=()=>{notes=[];renderNP()};
 addEventListener('pointerdown',e=>{const p=$('#np');if(!p.hidden&&!p.contains(e.target)&&!e.target.closest('#nc'))p.hidden=true});
-addEventListener('keydown',e=>{if(e.key!=='Escape')return;$('#np').hidden=true;Object.values(wins).forEach(w=>{if(w.zap){w.zap=false;w.el.querySelector('.zapb').classList.remove('on');zpost(w,{zap:'off'})}})});
+addEventListener('keydown',e=>{if(e.key!=='Escape')return;$('#np').hidden=true;zapOffAll()});
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),5000)}
 /* ---------- fenêtres ---------- */
 const wins={};let zi=10,nwin=0;
@@ -205,7 +206,7 @@ function openWin(key,title,extra=''){
  el.querySelector('[data-a=x]').onclick=()=>closeWin(key);
  place(w);focus(w);return el.querySelector('.wb');
 }
-function closeWin(id){if(wins[id]){wins[id].el.remove();delete wins[id]}}
+function closeWin(id){if(wins[id]){wins[id].el.remove();delete wins[id];zapSync()}}
 const PERMS='fullscreen; pointer-lock; keyboard-map; gamepad; autoplay; clipboard-read; clipboard-write; microphone; camera; accelerometer; gyroscope; encrypted-media; web-share';
 const SBOX='allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads allow-pointer-lock allow-presentation allow-orientation-lock';
 function openApp(a){
@@ -218,43 +219,61 @@ function openApp(a){
  else if(url){f.src=a.src;f.setAttribute('sandbox',SBOX+' allow-same-origin');w.el.querySelector('.ex').onclick=()=>window.open(a.src,'_blank','noopener')}
  else{f.srcdoc=withZap(a.src);f.setAttribute('sandbox',SBOX)}
  b.append(f);
- /* zappeur : possible seulement sur du contenu qu'on contrôle (apps système, du dépôt ou fichiers HTML) */
- const cap=a.def||a.repo||a.type==='html',zb=w.el.querySelector('.zapb');
- const no=()=>{const m='Zappeur indisponible sur un site externe (protection du navigateur). Ouvre-le dans un onglet, ou enregistre la page en fichier HTML puis ajoute-la comme app.';toast(m);notify(m)};
- zb.onclick=()=>{if(!cap)return no();injectZap(f);w.zap=!w.zap;zb.classList.toggle('on',w.zap);zpost(w,{zap:w.zap?'on':'off'})};
- zb.oncontextmenu=e=>{e.preventDefault();if(!cap)return no();injectZap(f);zapPanel(w)};
+ /* ⚡ : zappe l'app (si c'est un contenu qu'on contrôle) ET la page autour (ex. interface ajoutée par une extension) */
+ const cap=a.def||a.repo||a.type==='html',zb=w.el.querySelector('.zapb');w.cap=cap;
+ zb.onclick=()=>{w.zap=!w.zap;zb.classList.toggle('on',w.zap);
+  if(cap){injectZap(f);zpost(w,{zap:w.zap?'on':'off'})}
+  else if(w.zap)toast("Zappeur actif sur la page autour du site (ex. interface d'une extension). Le contenu du site lui-même reste inaccessible : clic droit sur ⚡ pour chercher un élément.");
+  zapSync()};
+ zb.oncontextmenu=e=>{e.preventDefault();if(cap)injectZap(f);zapPanel(w)};
 }
 /* ---------- zappeur d'éléments ---------- */
 const zpost=(w,m)=>{try{w.frame.contentWindow.postMessage(m,'*')}catch(e){}};
 function injectZap(f){try{const d=f.contentDocument;if(d&&d.defaultView&&!d.defaultView.__zap){const s=d.createElement('script');s.textContent='('+zapper+')()';d.documentElement.append(s)}}catch(e){}}
+/* Zappeur de la page hôte : permet de supprimer ce qu'une extension ajoute par-dessus l'iframe (même d'un site externe) */
+let HZ;
+const hostZap=()=>HZ||(HZ=zapper({skip:e=>!!e.closest('#wp,#stage,#layer,#np,.toast'),send(){}}));
+function zapSync(){const ws=Object.values(wins),any=ws.some(x=>x.zap);if(!any&&!HZ)return;hostZap().set(any,!ws.some(x=>x.zap&&x.cap))}
+function zapOffAll(){Object.values(wins).forEach(w=>{if(w.zap){w.zap=false;w.el.querySelector('.zapb').classList.remove('on');zpost(w,{zap:'off'})}});zapSync()}
 function zapPanel(w){
  let p=w.el.querySelector('.zp');
- if(p){p.hidden=!p.hidden;if(!p.hidden)p.querySelector('input').focus();return}
+ if(p){p.hidden=!p.hidden;if(!p.hidden){p.querySelector('input').focus();w.search()}return}
  p=document.createElement('div');p.className='zp';
- p.innerHTML='<input type="text" placeholder="Nom, id, classe ou texte…" aria-label="Rechercher un élément"><div class="zl"><p class="hint">Tape pour chercher un élément à supprimer.</p></div><button class="btn zu">Annuler le dernier zap</button>';
- w.el.append(p);const i=p.querySelector('input');
- i.oninput=()=>zpost(w,{zap:'find',q:i.value.trim()});
- p.querySelector('.zu').onclick=()=>{zpost(w,{zap:'undo'});setTimeout(()=>i.oninput(),50)};
- i.focus();
+ p.innerHTML='<input type="text" placeholder="Nom, id, classe ou texte…" aria-label="Rechercher un élément"><div class="zl"></div><button class="btn zu">Annuler le dernier zap</button>';
+ w.el.append(p);const i=p.querySelector('input');w.hl=[];w.fl=[];
+ w.search=()=>{const q=i.value.trim();w.hl=hostZap().find(q);drawZ(w);if(w.cap)zpost(w,{zap:'find',q})};
+ i.oninput=w.search;
+ p.querySelector('.zu').onclick=()=>{hostZap().undo();zpost(w,{zap:'undo'});setTimeout(w.search,50)};
+ i.focus();w.search();
+}
+function drawZ(w){
+ const l=w.el.querySelector('.zl');if(!l)return;
+ const sec=(t,a,s)=>a.length?`<h4>${t}</h4>`+a.map((x,i)=>`<div data-s="${s}" data-i="${i}">${esc(x)}</div>`).join(''):'';
+ l.innerHTML=sec('Page autour (extensions, interface)',w.hl||[],'h')+sec("Contenu de l'app",w.fl||[],'f')||'<p class="hint">Aucun élément trouvé.</p>';
+ l.querySelectorAll('div').forEach(x=>{const h=x.dataset.s==='h',i=+x.dataset.i;
+  x.onmouseenter=()=>h?hostZap().hl(i):zpost(w,{zap:'hl',i});
+  x.onclick=()=>{if(h){w.hl=hostZap().rm(i);drawZ(w)}else zpost(w,{zap:'rm',i})}});
 }
 function zapMsg(w,d){
- if(d.zap==='off'){w.zap=false;w.el.querySelector('.zapb').classList.remove('on')}
- if(d.zap==='found'){const l=w.el.querySelector('.zl');if(!l||!Array.isArray(d.list))return;
-  l.innerHTML=d.list.length?d.list.map((t,i)=>`<div data-i="${i}">${esc(t)}</div>`).join(''):'<p class="hint">Aucun élément trouvé.</p>';
-  l.querySelectorAll('div').forEach(x=>{x.onmouseenter=()=>zpost(w,{zap:'hl',i:+x.dataset.i});x.onclick=()=>zpost(w,{zap:'rm',i:+x.dataset.i})})}
+ if(d.zap==='off'){w.zap=false;w.el.querySelector('.zapb').classList.remove('on');zapSync()}
+ if(d.zap==='found'&&Array.isArray(d.list)){w.fl=d.list.map(String);drawZ(w)}
 }
-/* Script exécuté DANS la page zappée (injecté, ou ajouté au début du fichier HTML) */
-function zapper(){
- if(window.__zap)return;window.__zap=1;
+/* Zappeur : exécuté DANS la page zappée (injecté, ou ajouté au début du fichier HTML),
+   ou appelé avec une option H pour zapper la page hôte (index.html). Renvoie un contrôleur. */
+function zapper(H){
+ const host=!!H;
+ if(!host){if(window.__zap)return;window.__zap=1}
  let on=false,sel=null,up=[],found=[],stack=[],box,hint,sty;
- const send=m=>parent.postMessage(m,'*');
- const ok=e=>e&&e.nodeType===1&&e!==box&&e!==hint&&e!==document.documentElement&&e!==document.body;
+ const send=host?H.send:m=>parent.postMessage(m,'*');
+ const NO=/^(HEAD|SCRIPT|STYLE|LINK|META|NOSCRIPT|TITLE)$/;
+ const ok=e=>e&&e.nodeType===1&&e!==box&&e!==hint&&e!==sty&&e!==document.documentElement&&e!==document.body&&!(host&&H.skip(e));
  const ensure=()=>{if(box)return;
-  sty=document.createElement('style');sty.textContent='iframe,embed,object{pointer-events:none!important}';sty.disabled=true;
   box=document.createElement('div');hint=document.createElement('div');
   hint.style.cssText='position:fixed;z-index:2147483647;left:50%;top:8px;transform:translateX(-50%);padding:5px 12px;border-radius:999px;background:#111;color:#fff;font:12px system-ui,sans-serif;pointer-events:none;display:none;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,.5)';
-  hint.textContent='Zappeur actif : clic = supprimer · molette ou ↑↓ = parent / enfant · Ctrl+Z = annuler · Échap = quitter';
-  document.documentElement.append(sty,box,hint)};
+  hint.textContent='Zappeur actif : clic = supprimer · molette ou ↑↓ = parent / enfant · Échap = quitter';
+  const add=[box,hint];
+  if(!host){sty=document.createElement('style');sty.textContent='iframe,embed,object{pointer-events:none!important}';sty.disabled=true;add.push(sty)}
+  document.documentElement.append(...add)};
  const paint=(e,c)=>{ensure();if(!e||!document.documentElement.contains(e)){box.style.display='none';return}const r=e.getBoundingClientRect();
   box.style.cssText='position:fixed;z-index:2147483647;pointer-events:none;box-sizing:border-box;border:2px solid '+c+';background:'+(c==='#ff3b30'?'rgba(255,59,48,.28)':'rgba(255,204,0,.3)')+';left:'+r.left+'px;top:'+r.top+'px;width:'+r.width+'px;height:'+r.height+'px'};
  const pick=e=>{sel=ok(e)?e:null;paint(sel,'#ff3b30')};
@@ -263,31 +282,36 @@ function zapper(){
  const lab=e=>{let s=e.tagName.toLowerCase();if(e.id)s+='#'+e.id;const c=(typeof e.className==='string'?e.className:'').trim().split(/\s+/).filter(Boolean).slice(0,2);if(c.length)s+='.'+c.join('.');const t=(e.textContent||'').trim().replace(/\s+/g,' ').slice(0,30);return t?s+' — '+t:s};
  const lvl=d=>{if(!sel)return;if(d<0){const p=sel.parentElement;if(ok(p)){up.push(sel);pick(p)}}else if(up.length)pick(up.pop())};
  const mv=ev=>{up=[];pick(document.elementFromPoint(ev.clientX,ev.clientY))};
- const ck=ev=>{ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();const t=sel||document.elementFromPoint(ev.clientX,ev.clientY);if(ok(t)){hide(t);sel=null;box.style.display='none'}};
- const blk=ev=>{ev.preventDefault();ev.stopPropagation()};
- const wh=ev=>{ev.preventDefault();ev.stopPropagation();lvl(ev.deltaY)};
+ const ck=ev=>{if(host&&!sel)return;ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();const t=sel||document.elementFromPoint(ev.clientX,ev.clientY);if(ok(t)){hide(t);sel=null;box.style.display='none'}};
+ const blk=ev=>{if(host&&!sel)return;ev.preventDefault();ev.stopPropagation()};
+ const wh=ev=>{if(host&&!sel)return;ev.preventDefault();ev.stopPropagation();lvl(ev.deltaY)};
+ const out=ev=>{if(!ev.relatedTarget)pick(null)};
  const kd=ev=>{const k=ev.key;
-  if(k==='Escape'){ev.preventDefault();set(false);send({zap:'off'})}
-  else if(k==='ArrowUp'||k==='ArrowDown'){ev.preventDefault();lvl(k==='ArrowUp'?-1:1)}
-  else if((ev.ctrlKey||ev.metaKey)&&k==='z'){ev.preventDefault();undo()}};
- const E=[['mousemove',mv],['click',ck],['mousedown',blk],['mouseup',blk],['pointerdown',blk],['pointerup',blk],['dblclick',blk],['contextmenu',blk],['wheel',wh],['keydown',kd]];
+  if(!host&&k==='Escape'){ev.preventDefault();set(false);send({zap:'off'})}
+  else if(sel&&(k==='ArrowUp'||k==='ArrowDown')){ev.preventDefault();lvl(k==='ArrowUp'?-1:1)}
+  else if(!host&&(ev.ctrlKey||ev.metaKey)&&k==='z'){ev.preventDefault();undo()}};
+ const E=[['mousemove',mv],['mouseout',out],['click',ck],['mousedown',blk],['mouseup',blk],['pointerdown',blk],['pointerup',blk],['dblclick',blk],['contextmenu',blk],['wheel',wh],['keydown',kd]];
  const O={capture:true,passive:false};
- const set=v=>{if(v===on)return;on=v;ensure();
-  sty.disabled=!v;hint.style.display=v?'block':'none';if(!v){box.style.display='none';sel=null}
-  E.forEach(x=>v?addEventListener(x[0],x[1],O):removeEventListener(x[0],x[1],O))};
- const found_=()=>send({zap:'found',list:found.map(lab)});
- addEventListener('message',ev=>{const d=ev.data;if(!d||!d.zap||ev.source!==parent)return;
-  if(d.zap==='on')set(true);
-  else if(d.zap==='off')set(false);
-  else if(d.zap==='undo')undo();
-  else if(d.zap==='find'){ensure();if(!on)box.style.display='none';const q=(d.q||'').toLowerCase();found=[];
-   if(q&&document.body)for(const e of document.body.querySelectorAll('*')){if(!ok(e)||/^(SCRIPT|STYLE|LINK|META|NOSCRIPT)$/.test(e.tagName))continue;
-    const own=[].filter.call(e.childNodes,n=>n.nodeType===3).map(n=>n.textContent).join(' ');
-    const h=[e.tagName,e.id,typeof e.className==='string'?e.className:'',e.getAttribute('aria-label'),e.getAttribute('alt'),e.getAttribute('title'),e.getAttribute('name'),own].join(' ').toLowerCase();
-    if(h.indexOf(q)>-1){found.push(e);if(found.length>=40)break}}
-   found_()}
-  else if(d.zap==='hl'){const e=found[d.i];if(e){e.scrollIntoView({block:'center'});paint(e,'#ffcc00')}}
-  else if(d.zap==='rm'){const e=found[d.i];if(e){hide(e);found.splice(d.i,1);box.style.display='none';found_()}}});
+ const set=(v,h)=>{v=!!v;ensure();
+  if(v!==on){on=v;if(sty)sty.disabled=!v;E.forEach(x=>v?addEventListener(x[0],x[1],O):removeEventListener(x[0],x[1],O))}
+  hint.style.display=v&&h!==false?'block':'none';if(!v){box.style.display='none';sel=null}};
+ const top=()=>[].concat([].slice.call(document.documentElement.children),document.body?[].slice.call(document.body.children):[]).filter(e=>ok(e)&&!NO.test(e.tagName));
+ const find=q=>{ensure();if(!on)box.style.display='none';q=(q||'').toLowerCase();found=[];
+  if(!q){if(host)found=top().slice(0,40)}
+  else for(const e of document.querySelectorAll(host?'html > *, body *':'body *')){
+   if(!ok(e)||NO.test(e.tagName)||stack.some(s=>s.e===e))continue;
+   const own=[].filter.call(e.childNodes,n=>n.nodeType===3).map(n=>n.textContent).join(' ');
+   const h=[e.tagName,e.id,typeof e.className==='string'?e.className:'',e.getAttribute('aria-label'),e.getAttribute('alt'),e.getAttribute('title'),e.getAttribute('name'),own].join(' ').toLowerCase();
+   if(h.indexOf(q)>-1){found.push(e);if(found.length>=40)break}}
+  return found.map(lab)};
+ const hl=i=>{const e=found[i];if(e){e.scrollIntoView({block:'center'});paint(e,'#ffcc00')}};
+ const rm=i=>{const e=found[i];if(e){hide(e);found.splice(i,1);box.style.display='none'}return found.map(lab)};
+ if(!host)addEventListener('message',ev=>{const d=ev.data;if(!d||!d.zap||ev.source!==parent)return;
+  if(d.zap==='on')set(true);else if(d.zap==='off')set(false);else if(d.zap==='undo')undo();
+  else if(d.zap==='find')send({zap:'found',list:find(d.q)});
+  else if(d.zap==='hl')hl(d.i);
+  else if(d.zap==='rm')send({zap:'found',list:rm(d.i)})});
+ return{set,find,hl,rm,undo};
 }
 const zsc='<script>('+zapper+')()<\/script>';
 const withZap=h=>/<head[^>]*>/i.test(h)?h.replace(/<head[^>]*>/i,m=>m+zsc):/<html[^>]*>/i.test(h)?h.replace(/<html[^>]*>/i,m=>m+zsc):h+zsc;
