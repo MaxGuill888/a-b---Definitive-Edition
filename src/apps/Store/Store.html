@@ -185,6 +185,7 @@ const refresh=()=>{
  else if(cur==='mine'){const m=$('#mylist');if(m){m.innerHTML=list();bind()}}
 };
 OS.onState(refresh);setTimeout(()=>{if(!init)refresh()},800);
+addEventListener('message',e=>{const d=e.data;if(e.source===parent&&d&&d.zapcode&&!window.__zap)(0,eval)(d.zapcode)});
 </script>
 </body>
 </html>
