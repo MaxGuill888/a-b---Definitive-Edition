@@ -6,48 +6,49 @@
     <meta name="theme-color" content="#171717">
     <title>Installer a:b</title>
     <style>
-        :root{color-scheme:dark;--fg:#f4f4f4;--mut:#9a9a9e;--win:#2a2a2c;--ct:#171717;--field:#3a3a3c;--bd:rgba(255,255,255,.2);--accent:#b5e8d0;--error:#ff8c82}
-        *{box-sizing:border-box}
-        body{min-height:100vh;margin:0;padding:32px;display:grid;place-items:center;background-color:#111;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px),radial-gradient(ellipse at 18% 12%,rgba(107,138,128,.2),transparent 42%),radial-gradient(ellipse at 86% 88%,rgba(133,111,81,.15),transparent 39%);background-size:36px 36px,36px 36px,auto,auto;color:var(--fg);font-family:"Open Sans","Segoe UI",system-ui,sans-serif}
-        main{width:min(100%,680px);overflow:hidden;border:1px solid var(--bd);border-radius:12px;background:var(--win);box-shadow:0 24px 80px rgba(0,0,0,.48);animation:appear .45s ease-out both}
-        .titlebar{height:42px;padding:0 16px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--bd);color:var(--mut);font-size:12px}
-        .lights{display:flex;gap:6px;margin-right:4px}.lights i{width:9px;height:9px;border-radius:50%;background:#ff6258}.lights i:nth-child(2){background:#ffbd44}.lights i:nth-child(3){background:#35c759}
-        .content{padding:clamp(25px,6vw,52px)}
-        .brand{display:flex;align-items:center;gap:16px;margin-bottom:30px}
-        .mark{width:58px;height:58px;display:grid;place-items:center;border:1px solid var(--bd);border-radius:15px;background:#1e1e1e;font-size:27px;font-weight:650}
-        h1{margin:0;font-size:clamp(28px,6vw,40px);font-weight:550}
-        .sub{margin:4px 0 0;color:var(--mut);font-size:13px}
-        .rule{height:1px;margin:26px 0;background:var(--bd)}
-        .destination{display:flex;justify-content:space-between;gap:18px;align-items:center;font-size:13px}
-        .destination strong{font-weight:550}.destination span{color:var(--mut)}
-        .folder{margin-top:8px;color:var(--accent);font-size:13px}
-        .actions{display:flex;align-items:center;gap:12px;margin-top:26px}
-        button{min-height:40px;padding:0 17px;border:0;border-radius:8px;background:var(--fg);color:#171717;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .15s,transform .15s}
-        button:hover:not(:disabled){filter:brightness(.88)}button:active:not(:disabled){transform:scale(.98)}button:disabled{opacity:.45;cursor:default}
-        #launch{background:var(--accent)}#launch[hidden]{display:none}
-        .status{min-height:42px;margin-top:22px;color:var(--mut);font-size:12px;line-height:1.6}
-        .status strong{color:var(--fg);font-weight:550}.status.error{color:var(--error)}
-        .track{height:3px;margin-top:13px;overflow:hidden;background:rgba(255,255,255,.1)}
-        .track[hidden]{display:none}.bar{width:0;height:100%;background:var(--accent);transition:width .2s ease}
-        .foot{margin-top:26px;color:var(--mut);font-size:11px;line-height:1.6}
-        @keyframes appear{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-        @media(max-width:520px){body{padding:14px}.content{padding:26px 21px}.destination{align-items:flex-start;flex-direction:column;gap:5px}.actions{align-items:stretch;flex-direction:column}button{width:100%}}
-        @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+        :root{color-scheme:dark;--bd:rgba(255,255,255,.26);--tile:#1e1e1e;--fg:#f4f4f4;--mut:#9a9a9e;--win:#2a2a2c;--ct:#171717;--field:#3a3a3c;--hov:rgba(255,255,255,.1)}
+        [data-theme=light]{color-scheme:light;--bd:rgba(0,0,0,.2);--tile:#f3f3f5;--fg:#1b1b1d;--mut:#6b6b70;--win:#e6e6ea;--ct:#fbfbfc;--field:#d8d8de;--hov:rgba(0,0,0,.08)}
+        *{box-sizing:border-box;margin:0}
+        html,body{min-height:100%;background:#111;color:var(--fg);font-family:"Open Sans","Segoe UI",system-ui,sans-serif;user-select:none}
+        body{min-height:100vh;padding:18px;display:grid;place-items:center}
+        main{width:min(580px,100%);max-height:calc(100vh - 36px);display:flex;flex-direction:column;background:var(--win);border:1px solid var(--bd);border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.45);font-size:12px;overflow:hidden}
+        .tb{height:24px;flex:none;display:flex;align-items:center;padding:0 6px 0 11px}
+        .tt{flex:1;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--fg)}
+        .wb{flex:1;min-height:0;display:flex;padding:0 6px 6px}
+        .ct{flex:1;min-height:0;overflow:auto;background:var(--ct);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:9px}
+        .brand{display:flex;align-items:center;gap:8px}
+        .mark{width:32px;height:32px;flex:none;display:grid;place-items:center;border:1px solid var(--bd);border-radius:8px;background:var(--tile);font-size:14px;font-weight:700}
+        h1{font-size:15px;font-weight:400} .sub{margin-top:2px;color:var(--mut);font-size:10.5px}
+        .rule{height:1px;flex:none;background:var(--bd)}
+        .destination{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:11.5px}
+        .destination strong{font-weight:600}.destination span,.hint{color:var(--mut);font-size:10.5px}
+        .folder{color:var(--mut);font-size:11px;overflow-wrap:anywhere}
+        .actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+        .btn{background:var(--field);color:var(--fg);border:0;border-radius:8px;padding:5px 11px;font:inherit;font-size:11px;cursor:pointer}
+        .btn:hover:not(:disabled){filter:brightness(1.2)}.btn:disabled{opacity:.45;cursor:default}.btn.pri{background:var(--fg);color:var(--ct);font-weight:600}
+        #launch[hidden]{display:none}
+        .status{min-height:17px;color:var(--mut);font-size:10.5px;line-height:1.5;overflow-wrap:anywhere}
+        .status.error{color:#ff8c82}
+        .track{height:3px;flex:none;overflow:hidden;background:var(--field)}.track[hidden]{display:none}.bar{width:0;height:100%;background:var(--fg);transition:width .2s ease}
+        .foot{color:var(--mut);font-size:10.5px;line-height:1.5}
+        :focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+        @media(max-width:520px){body{padding:10px}main{max-height:calc(100vh - 20px)}.destination{align-items:flex-start;flex-direction:column;gap:3px}}
+        @media(prefers-reduced-motion:reduce){.bar{transition:none}}
     </style>
 </head>
 <body>
-    <main aria-labelledby="heading">
-        <div class="titlebar"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>Centre d'installation</span></div>
-        <section class="content">
-            <div class="brand"><div class="mark" aria-hidden="true">a:b</div><div><h1 id="heading">Installer a:b</h1><p class="sub">Definitive Edition</p></div></div>
+    <main aria-labelledby="window-title">
+        <div class="tb"><span class="tt">Centre d'installation</span></div>
+        <div class="wb"><section class="ct">
+            <header class="brand"><div class="mark" aria-hidden="true">a:b</div><div><h1 id="window-title">Installer a:b</h1><p class="sub">Definitive Edition</p></div></header>
             <div class="rule"></div>
             <div class="destination"><strong>Emplacement</strong><span>Choisissez le dossier parent dans Fichiers</span></div>
             <div class="folder" id="folder">Le dossier créé sera .a-b</div>
-            <div class="actions"><button id="install" type="button">Choisir un dossier et installer</button><button id="launch" type="button" hidden>Lancer a:b</button></div>
+            <div class="actions"><button class="btn" id="install" type="button">Choisir un dossier et installer</button><button class="btn pri" id="launch" type="button" hidden>Lancer a:b</button></div>
             <div id="status" class="status" role="status" aria-live="polite">Les fichiers seront téléchargés depuis le dépôt officiel a:b.</div>
             <div id="track" class="track" hidden><div id="bar" class="bar"></div></div>
             <p class="foot">L'installation nécessite une connexion Internet et un navigateur compatible avec l'accès aux fichiers (Chrome ou Edge). Après l'installation, le bouton ouvre l'index téléchargé avec ses fichiers locaux.</p>
-        </section>
+        </section></div>
     </main>
     <script>
         const REPOSITORY = 'MaxGuill888/a-b---Definitive-Edition';
@@ -61,6 +62,11 @@
         let installedIndexHandle = null;
         let installedRootHandle = null;
         let installedFiles = [];
+
+        try {
+            const savedConfig = JSON.parse(localStorage.getItem('cfg') || '{}');
+            if (savedConfig.theme === 'light') document.documentElement.dataset.theme = 'light';
+        } catch (error) {}
 
         function setStatus(message, kind = '') {
             status.textContent = message;
