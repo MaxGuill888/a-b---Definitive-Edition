@@ -167,7 +167,6 @@ Version du projet : Final Edition
 Type : Web UI / faux bureau / portail d'applications
 Technologies : HTML, CSS, JavaScript
 
-“Un bureau web personnalisé, centralisé et prêt à évoluer.”
 
 
 

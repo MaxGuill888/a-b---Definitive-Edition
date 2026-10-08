@@ -48,11 +48,15 @@ h2{font-size:15px;font-weight:400}h3{font-size:12px;margin-top:4px}
 </aside>
 <section class="ct" id="ct"></section>
 <script>
-/* API fournie par index.html (window.parent.OS) ; repli minimal si ouvert seul */
-const OS=(()=>{try{if(parent.OS)return parent.OS}catch(e){}
- const g=()=>JSON.parse(localStorage.getItem('apps')||'[]'),s=a=>localStorage.setItem('apps',JSON.stringify(a));
- return{cfg:{theme:'dark'},get apps(){return g()},addApp(a){s([...g().filter(x=>x.id!==a.id),a]);return true},removeApp(id){s(g().filter(a=>a.id!==id))},open(){},notify(t){console.log(t)},url:p=>new URL('../../'+p,location.href).href}})();
-document.documentElement.dataset.theme=OS.cfg.theme;
+/* Pont avec index.html par postMessage (fonctionne quelle que soit l'origine) */
+const OS=(()=>{let st={cfg:{theme:'dark'},apps:[],base:new URL('../../',location.href).href},n=0,P={},cb=()=>{};
+ const send=(m,a)=>new Promise(r=>{const id=++n;P[id]=r;try{parent.postMessage({os:1,id,m,a},'*')}catch(e){r()}});
+ addEventListener('message',e=>{const d=e.data;if(!d||d.os!==1||e.source!==parent)return;
+  if(d.state){st=d.state;document.documentElement.dataset.theme=st.cfg.theme;cb(st)}
+  if(d.id&&P[d.id]){P[d.id](d.r);delete P[d.id]}});
+ const o={get cfg(){return st.cfg},get apps(){return st.apps},url:p=>new URL(p,st.base).href,onState(f){cb=f},
+  addApp:a=>send('addApp',a),removeApp:id=>send('removeApp',id),open:id=>send('open',id),notify:t=>send('notify',t)};
+ send('hello');return o})();
 const $=s=>document.querySelector(s),ct=$('#ct'),q=$('#q');
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const hue=s=>{let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))%360;return h};
@@ -110,14 +114,14 @@ async function publish(c,name,html,iconUrl){
 /* ---------- Découvrir : catalogue du dépôt ---------- */
 const entryIcon=e=>!e.icon?'':/^(https?:|data:)/.test(e.icon)?e.icon:OS.url(`apps/${e.dir}/${e.icon}`);
 function drawDiscover(){
- if(cur!=='disc'||q.value.trim())return;
+ if(cur!=='disc'||q.value.trim()||!catalog)return;
  const have=new Set(OS.apps.map(a=>a.id));
  ct.innerHTML=`<h2>Découvrir</h2>`+(catalog.length?catalog.map(e=>{const id='r_'+e.dir,ic=entryIcon(e),on=have.has(id);
   return `<div class="item"><div class="tile">${face(e.name,ic,ic&&!/^(https?:|data:)/.test(e.icon)&&/\.svg$/i.test(e.icon))}</div><b>${esc(e.name)}</b><button class="btn ${on?'':'pri'}" data-i="${esc(e.dir)}">${on?'Ouvrir':'Installer'}</button></div>`}).join(''):'<p class="hint">Aucune app disponible pour le moment.</p>');
  ct.querySelectorAll('[data-i]').forEach(x=>x.onclick=()=>{
   const e=catalog.find(c=>c.dir===x.dataset.i),id='r_'+e.dir,ex=OS.apps.find(a=>a.id===id);
-  if(ex)return OS.open(ex);
-  OS.addApp({id,name:e.name,icon:entryIcon(e),type:'url',src:OS.url(`apps/${e.dir}/${e.dir}.html`),repo:1});drawDiscover()});
+  if(ex)return OS.open(id);
+  OS.addApp({id,name:e.name,icon:entryIcon(e),type:'url',src:OS.url(`apps/${e.dir}/${e.dir}.html`),repo:1})});
 }
 async function discover(){
  if(catalog)return drawDiscover();
@@ -129,8 +133,8 @@ async function discover(){
 const list=(f='')=>{const r=OS.apps.filter(a=>a.name.toLowerCase().includes(f.toLowerCase()));
  return r.length?r.map(a=>`<div class="item"><div class="tile">${faceApp(a)}</div><b>${esc(a.name)}</b><button class="btn" data-o="${esc(a.id)}">Ouvrir</button><button class="btn" data-d="${esc(a.id)}">Supprimer</button></div>`).join(''):'<p class="hint">Aucune app pour le moment.</p>'};
 function bind(){
- ct.querySelectorAll('[data-o]').forEach(x=>x.onclick=()=>OS.open(OS.apps.find(a=>a.id===x.dataset.o)));
- ct.querySelectorAll('[data-d]').forEach(x=>x.onclick=()=>{OS.removeApp(x.dataset.d);show(cur,q.value.trim())});
+ ct.querySelectorAll('[data-o]').forEach(x=>x.onclick=()=>OS.open(x.dataset.o));
+ ct.querySelectorAll('[data-d]').forEach(x=>x.onclick=()=>OS.removeApp(x.dataset.d));
 }
 function show(s,f=''){
  cur=s;document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('on',n.dataset.s===s&&!f));
@@ -146,7 +150,7 @@ function show(s,f=''){
  <label class="f">Lien de l'icône (facultatif)<input type="text" id="ic" placeholder="https://exemple.com/icone.png"></label>
  <label class="f">Nom de l'app (facultatif)<input type="text" id="nm" placeholder="Repris de la page si vide"></label>
  <div class="row"><button class="btn pri" id="add">Ajouter</button></div>
- <h3>Mes apps</h3><div style="display:flex;flex-direction:column;gap:6px">${list()}</div>`;
+ <h3>Mes apps</h3><div id="mylist" style="display:flex;flex-direction:column;gap:6px">${list()}</div>`;
  const g=x=>ct.querySelector(x);
  g('#gh').textContent=GH()?'Un fichier HTML est ajouté au dépôt GitHub : il devient disponible pour tout le monde dans Découvrir (après le déploiement). Il est installé directement chez toi.':'Publication GitHub non configurée (Paramètres) : le fichier HTML sera installé uniquement en local.';
  ct.querySelectorAll('[name=t]').forEach(r=>r.onchange=()=>{const f=r.value==='file'&&r.checked;g('#lu').hidden=f;g('#lf').hidden=!f;g('#gh').hidden=!f});
@@ -165,7 +169,7 @@ function show(s,f=''){
      try{id='r_'+await publish(c,name,src,ic);OS.notify(name+' publiée dans le dépôt : disponible dans Découvrir après le déploiement')}
      catch(e){OS.notify('Publication impossible ('+e.message+') : app installée en local')}}
     else OS.notify('Publication GitHub non configurée : app installée en local')}
-   if(!OS.addApp({id,name,icon:ic,type,src}))return OS.notify('Stockage plein : fichier trop lourd');
+   if(!await OS.addApp({id,name,icon:ic,type,src}))return OS.notify('Stockage plein : fichier trop lourd');
    catalog=null;show('mine');
   }finally{bt.disabled=false;bt.textContent='Ajouter'}};
  }
@@ -173,7 +177,15 @@ function show(s,f=''){
 }
 document.querySelectorAll('.nav').forEach(n=>n.onclick=()=>{q.value='';show(n.dataset.s)});
 q.oninput=()=>show(cur,q.value.trim());
-show('disc');
+let init=0;
+const refresh=()=>{
+ if(!init){init=1;return show('disc')}
+ if(q.value.trim())return show(cur,q.value.trim());
+ if(cur==='disc')drawDiscover();
+ else if(cur==='mine'){const m=$('#mylist');if(m){m.innerHTML=list();bind()}}
+};
+OS.onState(refresh);setTimeout(()=>{if(!init)refresh()},800);
+addEventListener('message',e=>{const d=e.data;if(e.source===parent&&d&&d.zapcode&&!window.__zap)(0,eval)(d.zapcode)});
 </script>
 </body>
 </html>

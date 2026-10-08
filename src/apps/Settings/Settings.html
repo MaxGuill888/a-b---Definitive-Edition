@@ -16,10 +16,10 @@ h2{font-size:15px;font-weight:400}h3{font-size:12px;margin-top:4px}
 label.row{font-size:11.5px;cursor:pointer}
 .btn{background:var(--field);color:var(--fg);border:0;border-radius:8px;padding:5px 11px;font:inherit;font-size:11px;cursor:pointer}
 .btn:hover{filter:brightness(1.2)}.btn.on{background:var(--fg);color:var(--ct);font-weight:600}
-:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
 .f{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--mut)}
-.f input{background:var(--field);border:0;border-radius:8px;color:var(--fg);padding:6px 8px;font:inherit;font-size:11.5px;outline:0;min-width:0}
+.f input{background:var(--field);border:0;border-radius:8px;color:var(--fg);padding:6px 8px;font:inherit;font-size:11.5px;outline:0;min-width:0;user-select:text}
 .hint{font-size:10.5px;color:var(--mut)}
+:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -30,6 +30,9 @@ label.row{font-size:11.5px;cursor:pointer}
   <h3>Horloge</h3>
   <label class="row"><input type="checkbox" id="h24"> Format 24 heures</label>
   <label class="row"><input type="checkbox" id="sec"> Afficher les secondes</label>
+  <h3>Zappeur d'éléments</h3>
+  <label class="row"><input type="checkbox" id="zap"> Afficher le bouton ⚡ dans la barre des fenêtres</label>
+  <p class="hint">Clic sur ⚡ : clique ensuite sur un élément pour le supprimer (Échap pour arrêter). Clic droit sur ⚡ : rechercher un élément par son nom. Il fonctionne comme celui d'uBlock, y compris sur abOS lui-même et ses apps (icônes, fenêtres, horloge…), et supprime ce qu'une extension ajoute par-dessus. Ctrl+Z annule. Le contenu d'un site externe reste inaccessible (interdit par le navigateur) : tu peux alors supprimer sa fenêtre entière.</p>
   <h3>Données</h3>
   <div class="row"><button class="btn" id="rst">Supprimer toutes mes apps</button></div>
   <h3>Publication GitHub</h3>
@@ -40,22 +43,29 @@ label.row{font-size:11.5px;cursor:pointer}
   <div class="row"><button class="btn" id="gs">Enregistrer</button><button class="btn" id="gx">Effacer</button></div>
 </section>
 <script>
-/* API fournie par index.html (window.parent.OS) ; repli minimal si ouvert seul */
-const OS=(()=>{try{if(parent.OS)return parent.OS}catch(e){}
- return{cfg:{theme:'dark',h24:true,sec:false},setCfg(p){Object.assign(this.cfg,p);document.documentElement.dataset.theme=this.cfg.theme},resetApps(){localStorage.removeItem('apps')}}})();
+/* Pont avec index.html par postMessage (fonctionne quelle que soit l'origine) */
+const OS=(()=>{let st={cfg:{theme:'dark',h24:true,sec:false,zap:false},apps:[],base:location.href},n=0,P={},cb=()=>{};
+ const send=(m,a)=>new Promise(r=>{const id=++n;P[id]=r;try{parent.postMessage({os:1,id,m,a},'*')}catch(e){r()}});
+ addEventListener('message',e=>{const d=e.data;if(!d||d.os!==1||e.source!==parent)return;
+  if(d.state){st=d.state;document.documentElement.dataset.theme=st.cfg.theme;cb(st)}
+  if(d.id&&P[d.id]){P[d.id](d.r);delete P[d.id]}});
+ const o={get cfg(){return st.cfg},onState(f){cb=f},setCfg:p=>send('setCfg',p),resetApps:()=>send('resetApps'),notify:t=>send('notify',t)};
+ send('hello');return o})();
 const $=s=>document.querySelector(s);
-document.documentElement.dataset.theme=OS.cfg.theme;
 const tb=[...document.querySelectorAll('[data-t]')];
-const mark=()=>tb.forEach(x=>x.classList.toggle('on',x.dataset.t===OS.cfg.theme));mark();
-tb.forEach(x=>x.onclick=()=>{OS.setCfg({theme:x.dataset.t});mark()});
-$('#h24').checked=OS.cfg.h24;$('#sec').checked=OS.cfg.sec;
+const sync=()=>{const c=OS.cfg;tb.forEach(x=>x.classList.toggle('on',x.dataset.t===c.theme));
+ $('#h24').checked=!!c.h24;$('#sec').checked=!!c.sec;$('#zap').checked=!!c.zap};
+OS.onState(sync);sync();
+tb.forEach(x=>x.onclick=()=>OS.setCfg({theme:x.dataset.t}));
 $('#h24').onchange=e=>OS.setCfg({h24:e.target.checked});
 $('#sec').onchange=e=>OS.setCfg({sec:e.target.checked});
+$('#zap').onchange=e=>OS.setCfg({zap:e.target.checked});
 $('#rst').onclick=()=>{if(confirm('Supprimer toutes les apps ajoutées ?'))OS.resetApps()};
 const gh=(()=>{try{return JSON.parse(localStorage.getItem('gh')||'{}')}catch(e){return{}}})();
 $('#gr').value=gh.repo||'';$('#gb').value=gh.branch||'';$('#gd').value=gh.dir||'';$('#gt').value=gh.token||'';
-$('#gs').onclick=()=>{localStorage.setItem('gh',JSON.stringify({repo:$('#gr').value.trim(),branch:$('#gb').value.trim(),dir:$('#gd').value.trim(),token:$('#gt').value.trim()}));OS.notify&&OS.notify('Publication GitHub enregistrée')};
+$('#gs').onclick=()=>{localStorage.setItem('gh',JSON.stringify({repo:$('#gr').value.trim(),branch:$('#gb').value.trim(),dir:$('#gd').value.trim(),token:$('#gt').value.trim()}));OS.notify('Publication GitHub enregistrée')};
 $('#gx').onclick=()=>{localStorage.removeItem('gh');['#gr','#gb','#gd','#gt'].forEach(x=>$(x).value='')};
+addEventListener('message',e=>{const d=e.data;if(e.source===parent&&d&&d.zapcode&&!window.__zap)(0,eval)(d.zapcode)});
 </script>
 </body>
 </html>
