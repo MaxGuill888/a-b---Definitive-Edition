@@ -1,0 +1,11 @@
+Bundled runtime assets:
+
+- scramjet/ is built from @mercuryworkshop/scramjet 1.1.0.
+  Upstream: https://github.com/MercuryWorkshop/scramjet
+  The accompanying upstream LICENSE file is included.
+- bare-mux/ contains @mercuryworkshop/bare-mux 2.1.9.
+  Upstream: https://github.com/MercuryWorkshop/bare-mux
+  The accompanying upstream LICENSE file is included.
+
+Epoxy, libcurl, and Bare Server transport modules are loaded from jsDelivr at
+runtime. Their licenses and upstream terms apply separately.

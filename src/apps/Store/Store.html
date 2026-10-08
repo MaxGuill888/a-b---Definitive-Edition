@@ -95,7 +95,7 @@ async function publish(c,name,html,iconUrl){
  const cat=await api(c,'GET','apps/catalog.json');let list=[];
  if(cat)list=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(cat.content.replace(/\n/g,'')),x=>x.charCodeAt(0))));
  const base=name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,' ').trim().split(' ').filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join('')||'App';
- let dir=base,n=2;const taken=d=>list.some(x=>x.dir===d)||['Settings','Store','Ai','Chat'].includes(d);
+ let dir=base,n=2;const taken=d=>list.some(x=>x.dir===d)||['Settings','Store','Ai','Chat','Browser'].includes(d);
  while(taken(dir))dir=base+n++;
  await put(c,`apps/${dir}/${dir}.html`,enc(html),`Ajout de l'app ${name}`);
  let icon=null;

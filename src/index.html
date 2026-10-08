@@ -73,7 +73,7 @@ const I={bell:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke
    Apps système : 'Dossier:Nom affiché' -> src/apps/Dossier/Dossier.html + src/apps/Dossier/icons/Dossier.svg
    Pour ajouter une app : ajoute par exemple 'Ai:Ai' ou 'Chat:Chat' à cette liste. */
 const ROOT=/\/src(\/|$)/.test(location.pathname)?'':'src/';
-const BUILTIN=['Settings:Paramètres','Store:App Store'].map(s=>{const[d,n]=s.split(':');
+const BUILTIN=['Settings:Paramètres','Store:App Store','Browser:Navigateur'].map(s=>{const[d,n]=s.split(':');
  return{id:d,name:n,def:1,src:`${ROOT}apps/${d}/${d}.html`,icon:`${ROOT}apps/${d}/icons/${d}.svg`}});
 const iconCache={};
 function loadIcons(root){root.querySelectorAll('.svgi').forEach(el=>{const u=el.dataset.src;

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Navigateur</title>
+<style>
+:root{--fg:#f4f4f4;--mut:#9a9a9e;--win:#2a2a2c;--ct:#171717;--field:#3a3a3c;--hov:rgba(255,255,255,.1);--bd:rgba(255,255,255,.18);--link:#9bbcff}
+[data-theme=light]{--fg:#1b1b1d;--mut:#6b6b70;--win:#e6e6ea;--ct:#fbfbfc;--field:#d8d8de;--hov:rgba(0,0,0,.08);--bd:rgba(0,0,0,.16);--link:#245bb5}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--win);color:var(--fg);font:12px "Open Sans","Segoe UI",system-ui,sans-serif}
+body{display:flex;flex-direction:column;padding:0 6px 6px;gap:6px}
+button,input{font:inherit;color:inherit}
+button{border:0;cursor:pointer}
+.toolbar{display:flex;align-items:center;gap:5px;min-height:30px}
+.tool{background:var(--field);border-radius:7px;min-width:27px;height:25px}
+.tool:disabled{opacity:.4;cursor:default}
+.address{display:flex;flex:1;gap:5px;min-width:0}
+.address input,.network input,.network select{width:100%;min-width:0;background:var(--ct);border:1px solid var(--bd);border-radius:7px;padding:6px 8px;outline:0;user-select:text}
+.primary{background:var(--fg);color:var(--ct);border-radius:7px;padding:0 10px;font-weight:600}
+.panel{background:var(--ct);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:7px;flex:none}
+.panel summary{cursor:pointer;font-weight:600}
+.network{display:flex;flex-direction:column;gap:7px}
+.network-row{display:flex;align-items:center;gap:8px}
+.network-row label{flex:1;min-width:0}
+.network-row select,.network-row input{max-width:240px}
+.hint{color:var(--mut);font-size:10.5px;line-height:1.45}
+.providers{display:flex;gap:6px;flex-wrap:wrap}
+.providers a{background:var(--field);color:var(--fg);text-decoration:none;border-radius:7px;padding:5px 8px}
+.providers a:hover,.tool:hover:not(:disabled){background:var(--hov)}
+.notice{color:var(--mut);font-size:10.5px;line-height:1.4}
+.error{color:#ff8c82;min-height:0}
+.error:empty{display:none}
+#status{color:var(--mut);font-size:10.5px;min-height:14px}
+#frame-host{flex:1;min-height:0;border-radius:10px;overflow:hidden;background:#fff}
+#frame-host iframe{display:block;width:100%;height:100%;border:0;background:#fff}
+:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+@media(max-width:480px){.toolbar{flex-wrap:wrap}.address{flex-basis:100%;order:2}.toolbar>.tool{flex:1}}
+</style>
+</head>
+<body>
+<form class="toolbar" id="nav">
+  <button class="tool" id="back" type="button" aria-label="Précédent" title="Précédent" disabled>←</button>
+  <button class="tool" id="forward" type="button" aria-label="Suivant" title="Suivant" disabled>→</button>
+  <button class="tool" id="reload" type="button" aria-label="Recharger" title="Recharger">↻</button>
+  <div class="address"><input id="url" type="text" placeholder="Adresse web ou recherche" aria-label="Adresse web ou recherche" autocomplete="url" spellcheck="false"><button class="primary" type="submit">Aller</button></div>
+  <button class="tool" id="open-tab" type="button" title="Ouvrir la page dans un nouvel onglet">↗</button>
+</form>
+<details class="panel" id="network-panel">
+  <summary>Réseau — Scramjet</summary>
+  <div class="network">
+    <div class="network-row" id="wisp-server-row">
+      <label class="hint" for="wisp-server">Serveur Wisp</label>
+      <select id="wisp-server" aria-label="Serveur Wisp">
+        <option value="wss://probuildingsupplies.com/w/">Probuilding Wisp</option>
+        <option value="wss://wisp.mercurywork.shop/">Mercury Wisp</option>
+        <option value="wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/">Reeyuki Wisp</option>
+        <option value="wss://reeyukiwisp.onrender.com/">Reeyuki Wisp 2</option>
+        <option value="custom">Mon serveur Wisp…</option>
+      </select>
+    </div>
+    <label class="network-row" id="custom-wisp-row" hidden>
+      <span class="hint">URL Wisp personnalisée</span>
+      <input id="custom-wisp" type="url" placeholder="wss://mon-serveur.example/w/" autocomplete="url">
+    </label>
+    <div class="network-row">
+      <label class="hint" for="transport">Transport</label>
+      <select id="transport" aria-label="Transport du proxy">
+        <option value="epoxy">Epoxy (Wisp)</option>
+        <option value="libcurl">libcurl (Wisp)</option>
+        <option value="bare">Bare Server</option>
+      </select>
+    </div>
+    <label class="network-row" id="bare-server-row" hidden>
+      <span class="hint">URL Bare Server</span>
+      <input id="bare-server" type="url" placeholder="https://mon-bare-server.example/" autocomplete="url">
+    </label>
+    <div class="network-row"><span class="hint" id="transport-hint">Transport WebSocket recommandé pour les serveurs Wisp.</span><button class="primary" id="save-network" type="button">Appliquer</button></div>
+    <p class="hint">Ces serveurs publics sont ceux listés par YukiOS. Leur disponibilité, leur vitesse et leurs règles d’utilisation peuvent changer ; configure un serveur que tu contrôles pour plus de fiabilité.</p>
+    <p class="notice">Un proxy peut voir les domaines visités et le trafic qu’il relaie. N’y saisis pas d’informations sensibles. Scramjet ne garantit pas que chaque site ou fonction sera compatible.</p>
+  </div>
+</details>
+<p class="error" id="error" role="status" aria-live="polite"></p>
+<p id="status" role="status" aria-live="polite">Le proxy se connectera lors de la première navigation.</p>
+<div id="frame-host" aria-label="Page web"></div>
+<script src="./vendor/scramjet/scramjet.all.js"></script>
+<script src="./vendor/bare-mux/index.js"></script>
+<script>
+const $=selector=>document.querySelector(selector);
+const input=$('#url'),error=$('#error'),status=$('#status');
+const SETTINGS_KEY='browser-network-settings';
+const DEFAULT_SERVER='wss://probuildingsupplies.com/w/';
+const WISP_SERVERS=[
+  {name:'Probuilding Wisp',url:DEFAULT_SERVER},
+  {name:'Mercury Wisp',url:'wss://wisp.mercurywork.shop/'},
+  {name:'Reeyuki Wisp',url:'wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/'},
+  {name:'Reeyuki Wisp 2',url:'wss://reeyukiwisp.onrender.com/'}
+];
+const TRANSPORTS={
+  epoxy:{name:'Epoxy (Wisp)',url:'https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@3.0.1/dist/index.mjs'},
+  libcurl:{name:'libcurl (Wisp)',url:'https://cdn.jsdelivr.net/npm/@mercuryworkshop/libcurl-transport@2.0.5/dist/index.mjs'},
+  bare:{name:'Bare Server',url:'https://cdn.jsdelivr.net/npm/@mercuryworkshop/bare-as-module3@2.2.5/dist/index.mjs'}
+};
+let network={transport:'epoxy',server:DEFAULT_SERVER,bareServer:''};
+let proxyController=null,proxyFrame=null,bareMux=null,history=[],historyIndex=-1;
+
+try{document.documentElement.dataset.theme=parent.OS?.cfg?.theme||'dark'}
+catch{document.documentElement.dataset.theme='dark'}
+try{network=Object.assign(network,JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'))}
+catch{error.textContent='Les réglages réseau enregistrés sont illisibles ; les valeurs par défaut sont utilisées.'}
+
+function selectedServer(){return WISP_SERVERS.some(server=>server.url===network.server)?network.server:'custom'}
+function updateNetworkFields(){
+  const isBare=$('#transport').value==='bare';
+  $('#wisp-server-row').hidden=isBare;
+  $('#custom-wisp-row').hidden=isBare||$('#wisp-server').value!=='custom';
+  $('#bare-server-row').hidden=!isBare;
+  $('#transport-hint').textContent=$('#transport').value==='bare'
+    ?'Bare Server nécessite un serveur HTTP(S) compatible, à héberger ou fournir séparément.'
+    :'Transport WebSocket recommandé pour les serveurs Wisp.';
+}
+$('#wisp-server').value=selectedServer();
+$('#custom-wisp').value=selectedServer()==='custom'?network.server:'';
+$('#transport').value=TRANSPORTS[network.transport]?network.transport:'epoxy';
+$('#bare-server').value=network.bareServer||'';
+updateNetworkFields();
+$('#wisp-server').addEventListener('change',updateNetworkFields);
+$('#transport').addEventListener('change',updateNetworkFields);
+function readNetworkSettings(){
+  const transport=$('#transport').value;
+  let server=network.server||DEFAULT_SERVER;
+  const bareServer=$('#bare-server').value.trim();
+  if(transport!=='bare'){
+    server=$('#wisp-server').value==='custom'?$('#custom-wisp').value.trim():$('#wisp-server').value;
+    let parsed;
+    try{parsed=new URL(server)}catch{throw new Error('Entre une adresse Wisp valide.')}
+    if(!['wss:','ws:'].includes(parsed.protocol))throw new Error('Le serveur Wisp doit utiliser ws:// ou wss://.');
+    if(location.protocol==='https:'&&parsed.protocol!=='wss:')throw new Error('Une page HTTPS exige un serveur Wisp sécurisé en wss://.');
+    server=parsed.href;
+  }
+  if(transport==='bare'){
+    let bare;
+    try{bare=new URL(bareServer)}catch{throw new Error('Entre une adresse Bare Server valide.')}
+    if(!['https:','http:'].includes(bare.protocol))throw new Error('Bare Server doit utiliser HTTP ou HTTPS.');
+    if(location.protocol==='https:'&&bare.protocol!=='https:')throw new Error('Une page HTTPS exige un Bare Server en HTTPS.');
+  }
+  return{transport,server,bareServer};
+}
+$('#save-network').addEventListener('click',()=>{
+  try{
+    network=readNetworkSettings();
+    localStorage.setItem(SETTINGS_KEY,JSON.stringify(network));
+    error.textContent='';
+    status.textContent='Réglages réseau enregistrés. Ils seront utilisés à la prochaine navigation.';
+    if(historyIndex>=0)navigate(history[historyIndex],false);
+  }catch(e){error.textContent=e.message}
+});
+
+function resolveAddress(value){
+  const text=value.trim();
+  if(!text)throw new Error('Entre une adresse web.');
+  let url;
+  try{url=new URL(/^[\w-]+(\.[\w-]+)+/.test(text)&&!/^https?:\/\//i.test(text)?`https://${text}`:text)}
+  catch{url=new URL(`https://www.google.com/search?q=${encodeURIComponent(text)}`)}
+  if(!['http:','https:'].includes(url.protocol))throw new Error('Seules les adresses HTTP et HTTPS sont acceptées.');
+  return url.href;
+}
+function setHistoryButtons(){
+  $('#back').disabled=historyIndex<=0;
+  $('#forward').disabled=historyIndex<0||historyIndex>=history.length-1;
+}
+function addHistory(url){
+  if(history[historyIndex]===url)return;
+  history=history.slice(0,historyIndex+1);
+  history.push(url);
+  historyIndex=history.length-1;
+  setHistoryButtons();
+}
+function ensureSecureContext(){
+  if(!navigator.serviceWorker||!isSecureContext||location.protocol==='blob:')
+    throw new Error('Scramjet nécessite HTTPS (par exemple GitHub Pages) ou localhost : les service workers ne fonctionnent pas depuis un fichier ou un lien blob.');
+  if(!window.$scramjetLoadController||!window.BareMux?.BareMuxConnection)
+    throw new Error('Le moteur Scramjet ou BareMux n’a pas pu être chargé. Vérifie que les fichiers du navigateur sont présents.');
+}
+async function waitForController(){
+  if(navigator.serviceWorker.controller)return;
+  await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>{navigator.serviceWorker.removeEventListener('controllerchange',onChange);reject(new Error('Le service worker Scramjet n’a pas pris le contrôle de cette page. Recharge-la puis réessaie.'))},10000);
+    function onChange(){clearTimeout(timer);navigator.serviceWorker.removeEventListener('controllerchange',onChange);resolve()}
+    navigator.serviceWorker.addEventListener('controllerchange',onChange);
+  });
+}
+async function initializeProxy(){
+  ensureSecureContext();
+  if(!proxyController){
+    const root=new URL('./',location.href);
+    const rootPath=root.pathname;
+    const {ScramjetController}=window.$scramjetLoadController();
+    proxyController=new ScramjetController({prefix:`${rootPath}proxy/`,files:{
+      wasm:new URL('./vendor/scramjet/scramjet.wasm.wasm',root).href,
+      all:new URL('./vendor/scramjet/scramjet.all.js',root).href,
+      sync:new URL('./vendor/scramjet/scramjet.sync.js',root).href
+    }});
+    await proxyController.init();
+    const workerUrl=new URL('./sw.js',root);
+    await navigator.serviceWorker.register(workerUrl.href,{scope:rootPath});
+    await navigator.serviceWorker.ready;
+    await waitForController();
+    bareMux=new window.BareMux.BareMuxConnection(new URL('./vendor/bare-mux/worker.js',root).href);
+  }
+  const settings=readNetworkSettings();
+  network=settings;
+  const transport=TRANSPORTS[settings.transport];
+  const args=settings.transport==='epoxy'
+    ?[{wisp:settings.server}]
+    :settings.transport==='libcurl'
+      ?[{websocket:settings.server}]
+      :[settings.bareServer];
+  await bareMux.setTransport(transport.url,args);
+}
+function showCurrentUrl(url){
+  try{input.value=new URL(String(url)).href}catch{}
+}
+function createProxyFrame(){
+  if(proxyFrame)return proxyFrame;
+  proxyFrame=proxyController.createFrame();
+  proxyFrame.frame.title='Page web';
+  $('#frame-host').replaceChildren(proxyFrame.frame);
+  proxyFrame.addEventListener('urlchange',event=>{
+    const url=String(event.url);
+    showCurrentUrl(url);
+    addHistory(url);
+  });
+  return proxyFrame;
+}
+async function navigate(target,addToHistoryEntry=true){
+  error.textContent='';
+  let resolved;
+  try{resolved=resolveAddress(target);if(addToHistoryEntry)addHistory(resolved)}
+  catch(e){error.textContent=e.message;return}
+  input.value=resolved;
+  status.textContent='Connexion au proxy et chargement de la page…';
+  $('#save-network').disabled=true;
+  try{
+    await initializeProxy();
+    createProxyFrame().go(resolved);
+    status.textContent=`Transport ${TRANSPORTS[network.transport].name} — ${network.transport==='bare'?'Bare Server personnalisé':WISP_SERVERS.find(server=>server.url===network.server)?.name||network.server}`;
+  }catch(e){
+    status.textContent='';
+    error.textContent=e.message||'Impossible d’initialiser le proxy.';
+  }finally{$('#save-network').disabled=false}
+}
+$('#nav').addEventListener('submit',event=>{event.preventDefault();navigate(input.value)});
+$('#back').addEventListener('click',()=>{
+  if(historyIndex<=0)return;
+  historyIndex--;
+  setHistoryButtons();
+  navigate(history[historyIndex],false);
+});
+$('#forward').addEventListener('click',()=>{
+  if(historyIndex>=history.length-1)return;
+  historyIndex++;
+  setHistoryButtons();
+  navigate(history[historyIndex],false);
+});
+$('#reload').addEventListener('click',()=>{if(proxyFrame)proxyFrame.reload()});
+$('#open-tab').addEventListener('click',()=>{
+  if(!proxyFrame||historyIndex<0)return;
+  try{window.open(new URL(proxyController.encodeUrl(history[historyIndex]),location.href).href,'_blank','noopener,noreferrer')}
+  catch(e){error.textContent=e.message}
+});
+setHistoryButtons();
+</script>
+</body>
+</html>

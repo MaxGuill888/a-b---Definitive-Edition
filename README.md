@@ -58,6 +58,7 @@ Il a été pensé pour fonctionner comme une "page de démarrage" ou un portail 
 Les applications système présentes dans le dépôt incluent :
 - Paramètres
 - App Store
+- Navigateur Scramjet avec choix du transport et de serveurs Wisp publics ou personnalisés
 - Chat
 - AI
 
@@ -77,6 +78,14 @@ Le dépôt est prêt à être déployé via GitHub Pages, avec une page de redir
     └── apps/
         ├── Ai/
         │   └── Ai.html
+        ├── Browser/
+        │   ├── Browser.html
+        │   ├── sw.js
+        │   ├── icons/Browser.svg
+        │   └── vendor/
+        │       ├── NOTICE.txt
+        │       ├── bare-mux/
+        │       └── scramjet/
         ├── Chat/
         │   └── Chat.html
         ├── Settings/
@@ -121,6 +130,13 @@ L'App Store permet d'ajouter des liens ou fichiers HTML en tant qu'applications 
 ### Paramètres
 La section Paramètres permet de personnaliser l'apparence globale du bureau et de gérer les apps installées.
 
+### Navigateur
+Le Navigateur utilise Scramjet et un service worker pour relayer les requêtes, avec un choix de transport (Epoxy/Wisp, libcurl/Wisp ou Bare Server). Il propose les serveurs Wisp publics listés par YukiOS, ainsi que la saisie d'une adresse Wisp ou Bare Server personnelle. Les modules de transport Epoxy, libcurl et Bare Server sont chargés depuis jsDelivr lors de leur sélection.
+
+Le proxy nécessite un contexte sécurisé (HTTPS, par exemple GitHub Pages, ou `localhost`) : il ne fonctionne pas depuis `file://` ni depuis l'installateur local qui ouvre une page `blob:`. Les serveurs publics sont tiers ; disponibilité, latence et règles d'utilisation peuvent changer. Un proxy peut voir les domaines visités et le trafic qu'il relaie : ne saisis pas d'informations sensibles sur un serveur auquel tu ne fais pas confiance. Scramjet ne garantit pas la compatibilité de tous les sites.
+
+Le runtime Scramjet et BareMux est fourni dans `src/apps/Browser/vendor/` avec ses fichiers de licence et d'attribution.
+
 ## Notes de conception
 
 - Le projet est entièrement frontal (HTML/CSS/JS)
@@ -133,6 +149,7 @@ La section Paramètres permet de personnaliser l'apparence globale du bureau et 
 - Il ne s'agit pas d'un système d'exploitation complet
 - Les pages d'AI et de Chat sont des modules de base et peuvent être enrichis
 - Les applications installées sont principalement des fenêtres iframe ou des liens externes
+- Les modes Wisp et Bare Server nécessitent un serveur compatible ; GitHub Pages héberge le client mais n'exécute pas le serveur proxy
 
 ## Licence
 
@@ -151,9 +168,6 @@ Type : Web UI / faux bureau / portail d'applications
 Technologies : HTML, CSS, JavaScript
 
 “Un bureau web personnalisé, centralisé et prêt à évoluer.”
-
-
-
 
 
 
