@@ -216,7 +216,26 @@ async function initializeProxy(){
     :settings.transport==='libcurl'
       ?[{websocket:settings.server}]
       :[settings.bareServer];
-  await bareMux.setTransport(transport.url,args);
+  const moduleUrl=JSON.stringify(transport.url);
+  const transportName=JSON.stringify(transport.name);
+  const adapter=`
+    const {default: BaseTransport}=await import(${moduleUrl});
+    function normalizeHeaders(headers){
+      if(!headers)return [];
+      if(typeof headers[Symbol.iterator]==="function")return headers;
+      return Object.entries(headers);
+    }
+    class CompatibleTransport extends BaseTransport{
+      request(remote,method,body,headers,signal){
+        return super.request(remote,method,body,normalizeHeaders(headers),signal);
+      }
+      connect(url,protocols,headers,onopen,onmessage,onclose,onerror){
+        return super.connect(url,protocols,normalizeHeaders(headers),onopen,onmessage,onclose,onerror);
+      }
+    }
+    return [CompatibleTransport,${transportName}];
+  `;
+  await bareMux.setManualTransport(adapter,args);
 }
 function showCurrentUrl(url){
   try{input.value=new URL(String(url)).href}catch{}
