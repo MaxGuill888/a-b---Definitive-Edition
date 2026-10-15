@@ -47,6 +47,8 @@ self.addEventListener('fetch',event=>{
   event.respondWith((async()=>{
     try{
       await scramjet.loadConfig();
+      if(!scramjet.config?.prefix||!scramjet.config?.files?.wasm)
+        throw new Error('La configuration Scramjet est absente. Recharge l’application Navigateur puis réessaie.');
       if(scramjet.route(event)){
         const response=await scramjet.fetch(event);
         return await restoreEscapedHtml(response,event.request);

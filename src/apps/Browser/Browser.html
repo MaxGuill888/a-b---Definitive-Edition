@@ -203,11 +203,11 @@ async function initializeProxy(targetUrl){
       all:new URL('./vendor/scramjet/scramjet.all.js',root).href,
       sync:new URL('./vendor/scramjet/scramjet.sync.js',root).href
     }});
-    await proxyController.init();
     const workerUrl=new URL('./sw.js',root);
     await navigator.serviceWorker.register(workerUrl.href,{scope:rootPath});
     await navigator.serviceWorker.ready;
     await waitForController();
+    await proxyController.init();
     bareMux=new window.BareMux.BareMuxConnection(new URL('./vendor/bare-mux/worker.js',root).href);
   }
   const transport=TRANSPORTS[settings.transport];
