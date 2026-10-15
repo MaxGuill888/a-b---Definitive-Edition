@@ -183,70 +183,34 @@ function ensureSecureContext(){
   if(!window.$scramjetLoadController||!window.BareMux?.BareMuxConnection)
     throw new Error('Le moteur Scramjet ou BareMux n’a pas pu être chargé. Vérifie que les fichiers du navigateur sont présents.');
 }
-async function waitForController(){
-  if(navigator.serviceWorker.controller)return;
+async function waitForController(registration,expectedScriptUrl){
+  const isControlledByActiveWorker=()=>registration.active?.state==='activated'
+    &&registration.active.scriptURL===expectedScriptUrl
+    &&navigator.serviceWorker.controller===registration.active;
+  if(isControlledByActiveWorker())return;
   await new Promise((resolve,reject)=>{
-    const timer=setTimeout(()=>{navigator.serviceWorker.removeEventListener('controllerchange',onChange);reject(new Error('Le service worker Scramjet n’a pas pris le contrôle de cette page. Recharge-la puis réessaie.'))},10000);
-    function onChange(){clearTimeout(timer);navigator.serviceWorker.removeEventListener('controllerchange',onChange);resolve()}
-    navigator.serviceWorker.addEventListener('controllerchange',onChange);
-  });
-}
-const SCRAMJET_STORES=['config','cookies','redirectTrackers','referrerPolicies','publicSuffixList'];
-function openScramjetDatabase(){
-  return new Promise((resolve,reject)=>{
-    const request=indexedDB.open('$scramjet',1);
-    request.addEventListener('upgradeneeded',()=>{
-      const database=request.result;
-      for(const store of SCRAMJET_STORES)
-        if(!database.objectStoreNames.contains(store))database.createObjectStore(store);
-    });
-    request.addEventListener('success',()=>resolve(request.result),{once:true});
-    request.addEventListener('error',()=>reject(request.error),{once:true});
-  });
-}
-function readScramjetStore(database,name){
-  return new Promise((resolve,reject)=>{
-    const transaction=database.transaction(name,'readonly');
-    const store=transaction.objectStore(name);
-    const keys=store.getAllKeys(),values=store.getAll();
-    transaction.addEventListener('complete',()=>resolve(keys.result.map((key,index)=>[key,values.result[index]])),{once:true});
-    transaction.addEventListener('error',()=>reject(transaction.error),{once:true});
-    transaction.addEventListener('abort',()=>reject(transaction.error||new Error(`Impossible de lire le magasin Scramjet ${name}.`)),{once:true});
-  });
-}
-async function ensureScramjetDatabase(){
-  let database=await openScramjetDatabase();
-  const existing=SCRAMJET_STORES.filter(store=>database.objectStoreNames.contains(store));
-  if(existing.length===SCRAMJET_STORES.length){database.close();return}
-
-  const saved=new Map();
-  try{
-    for(const store of existing)saved.set(store,await readScramjetStore(database,store));
-  }finally{database.close()}
-
-  await new Promise((resolve,reject)=>{
-    const request=indexedDB.deleteDatabase('$scramjet');
-    let blockedTimer;
-    request.addEventListener('success',()=>{
-      clearTimeout(blockedTimer);
+    const timer=setTimeout(()=>{
+      clearInterval(check);
+      reject(new Error('Le nouveau service worker Scramjet n’a pas pris le contrôle de cette page. Ferme les autres onglets puis recharge l’application.'));
+    },10000);
+    const check=setInterval(()=>{
+      if(!isControlledByActiveWorker())return;
+      clearTimeout(timer);
+      clearInterval(check);
       resolve();
-    },{once:true});
-    request.addEventListener('error',()=>reject(request.error),{once:true});
-    request.addEventListener('blocked',()=>{
-      blockedTimer=setTimeout(()=>reject(new Error('La base Scramjet endommagée reste ouverte. Ferme les autres onglets de l’application puis réessaie.')),10000);
-    },{once:true});
+    },50);
   });
-  database=await openScramjetDatabase();
-  try{
-    const transaction=database.transaction(SCRAMJET_STORES,'readwrite');
-    for(const [name,records] of saved)
-      for(const [key,value] of records)transaction.objectStore(name).put(value,key);
-    await new Promise((resolve,reject)=>{
-      transaction.addEventListener('complete',resolve,{once:true});
-      transaction.addEventListener('error',()=>reject(transaction.error),{once:true});
-      transaction.addEventListener('abort',()=>reject(transaction.error||new Error('Impossible de restaurer les données Scramjet conservées.')),{once:true});
-    });
-  }finally{database.close()}
+}
+const SCRAMJET_DATABASE_NAME='$scramjet-browser-v2';
+function isolateScramjetDatabase(){
+  const factory=indexedDB;
+  const nativeOpen=factory.open.bind(factory);
+  Object.defineProperty(factory,'open',{
+    configurable:true,
+    value(name,...options){
+      return nativeOpen(name==='$scramjet'?SCRAMJET_DATABASE_NAME:name,...options);
+    }
+  });
 }
 async function initializeProxy(targetUrl){
   ensureSecureContext();
@@ -260,12 +224,12 @@ async function initializeProxy(targetUrl){
       all:new URL('./vendor/scramjet/scramjet.all.js',root).href,
       sync:new URL('./vendor/scramjet/scramjet.sync.js',root).href
     }});
-    await ensureScramjetDatabase();
-    await controller.init();
-    const workerUrl=new URL('./sw.js',root);
+    isolateScramjetDatabase();
+    const workerUrl=new URL('./sw.js?database=isolated-v2',root);
     await navigator.serviceWorker.register(workerUrl.href,{scope:rootPath});
-    await navigator.serviceWorker.ready;
-    await waitForController();
+    const registration=await navigator.serviceWorker.ready;
+    await waitForController(registration,workerUrl.href);
+    await controller.init();
     const mux=new window.BareMux.BareMuxConnection(new URL('./vendor/bare-mux/worker.js',root).href);
     proxyController=controller;
     bareMux=mux;

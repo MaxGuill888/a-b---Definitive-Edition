@@ -1,5 +1,14 @@
 importScripts("./vendor/scramjet/scramjet.all.js");
 
+const SCRAMJET_DATABASE_NAME='$scramjet-browser-v2';
+const nativeIndexedDBOpen=indexedDB.open.bind(indexedDB);
+Object.defineProperty(indexedDB,'open',{
+  configurable:true,
+  value(name,...options){
+    return nativeIndexedDBOpen(name==='$scramjet'?SCRAMJET_DATABASE_NAME:name,...options);
+  }
+});
+
 const {ScramjetServiceWorker}=self.$scramjetLoadWorker();
 const scramjet=new ScramjetServiceWorker();
 const proxyPrefix=new URL('proxy/',self.registration.scope).href;
