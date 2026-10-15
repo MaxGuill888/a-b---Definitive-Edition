@@ -1,6 +1,6 @@
 importScripts("./vendor/scramjet/scramjet.all.js");
 
-const SCRAMJET_DATABASE_NAME='$scramjet-browser-v2';
+const SCRAMJET_DATABASE_NAME='$scramjet-browser-v3';
 const nativeIndexedDBOpen=indexedDB.open.bind(indexedDB);
 Object.defineProperty(indexedDB,'open',{
   configurable:true,

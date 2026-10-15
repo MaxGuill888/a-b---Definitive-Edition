@@ -201,7 +201,7 @@ async function waitForController(registration,expectedScriptUrl){
     },50);
   });
 }
-const SCRAMJET_DATABASE_NAME='$scramjet-browser-v2';
+const SCRAMJET_DATABASE_NAME='$scramjet-browser-v3';
 function isolateScramjetDatabase(){
   const factory=indexedDB;
   const nativeOpen=factory.open.bind(factory);
@@ -225,11 +225,11 @@ async function initializeProxy(targetUrl){
       sync:new URL('./vendor/scramjet/scramjet.sync.js',root).href
     }});
     isolateScramjetDatabase();
-    const workerUrl=new URL('./sw.js?database=isolated-v2',root);
+    await controller.init();
+    const workerUrl=new URL('./sw.js?database=isolated-v3',root);
     await navigator.serviceWorker.register(workerUrl.href,{scope:rootPath});
     const registration=await navigator.serviceWorker.ready;
     await waitForController(registration,workerUrl.href);
-    await controller.init();
     const mux=new window.BareMux.BareMuxConnection(new URL('./vendor/bare-mux/worker.js',root).href);
     proxyController=controller;
     bareMux=mux;
