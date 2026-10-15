@@ -8,7 +8,10 @@ async function restoreEscapedHtml(response,request){
   if(!isDocument||!response.body)return response;
   try{
     const html=await response.clone().text();
-    if(!/^\s*(?:&lt;!doctype\s+html|&lt;html\b)/i.test(html))return response;
+    const escapedHtml=/^\s*(?:&lt;!doctype\s+html|&lt;html\b)/i.test(html);
+    const rawHtml=/^\s*(?:<!doctype\s+html|<html\b)/i.test(html);
+    if(!escapedHtml&&!rawHtml)return response;
+    if(rawHtml&&response.headers.get('content-type')?.toLowerCase().includes('text/html'))return response;
     const entities={
       '&amp;':'&',
       '&lt;':'<',
@@ -17,7 +20,9 @@ async function restoreEscapedHtml(response,request){
       '&#39;':"'",
       '&#x27;':"'"
     };
-    const restored=html.replace(/&(?:amp|lt|gt|quot|#39|#x27);/gi,entity=>entities[entity.toLowerCase()]);
+    const restored=escapedHtml
+      ?html.replace(/&(?:amp|lt|gt|quot|#39|#x27);/gi,entity=>entities[entity.toLowerCase()])
+      :html;
     const headers=new Headers(response.headers);
     headers.set('content-type','text/html; charset=utf-8');
     headers.delete('content-length');
