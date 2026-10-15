@@ -90,11 +90,11 @@ const $=selector=>document.querySelector(selector);
 const input=$('#url'),error=$('#error'),status=$('#status');
 const SETTINGS_KEY='browser-network-settings';
 const DEFAULT_SERVER='wss://probuildingsupplies.com/w/';
+const RETIRED_WISP_SERVERS=['wss://reeyukiwisp.onrender.com/'];
 const WISP_SERVERS=[
   {name:'Probuilding Wisp',url:DEFAULT_SERVER},
-  {name:'Mercury Wisp',url:'wss://wisp.mercurywork.shop/'},
   {name:'Reeyuki Wisp',url:'wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/'},
-  {name:'Reeyuki Wisp 2',url:'wss://reeyukiwisp.onrender.com/'}
+  {name:'Mercury Wisp',url:'wss://wisp.mercurywork.shop/'}
 ];
 const TRANSPORTS={
   epoxy:{name:'Epoxy (Wisp)',url:'https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@3.0.1/dist/index.mjs'},
@@ -108,6 +108,7 @@ try{document.documentElement.dataset.theme=parent.OS?.cfg?.theme||'dark'}
 catch{document.documentElement.dataset.theme='dark'}
 try{network=Object.assign(network,JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'))}
 catch{error.textContent='Les réglages réseau enregistrés sont illisibles ; les valeurs par défaut sont utilisées.'}
+if(RETIRED_WISP_SERVERS.includes(network.server))network.server=DEFAULT_SERVER;
 
 function selectedServer(){return WISP_SERVERS.some(server=>server.url===network.server)?network.server:'custom'}
 function updateNetworkFields(){
@@ -190,8 +191,9 @@ async function waitForController(){
     navigator.serviceWorker.addEventListener('controllerchange',onChange);
   });
 }
-async function initializeProxy(){
+async function initializeProxy(targetUrl){
   ensureSecureContext();
+  const settings=readNetworkSettings();
   if(!proxyController){
     const root=new URL('./',location.href);
     const rootPath=root.pathname;
@@ -208,14 +210,7 @@ async function initializeProxy(){
     await waitForController();
     bareMux=new window.BareMux.BareMuxConnection(new URL('./vendor/bare-mux/worker.js',root).href);
   }
-  const settings=readNetworkSettings();
-  network=settings;
   const transport=TRANSPORTS[settings.transport];
-  const args=settings.transport==='epoxy'
-    ?[{wisp:settings.server}]
-    :settings.transport==='libcurl'
-      ?[{websocket:settings.server}]
-      :[settings.bareServer];
   const moduleUrl=JSON.stringify(transport.url);
   const transportName=JSON.stringify(transport.name);
   const adapter=`
@@ -235,7 +230,52 @@ async function initializeProxy(){
     }
     return [CompatibleTransport,${transportName}];
   `;
-  await bareMux.setManualTransport(adapter,args);
+  const root=new URL('./',location.href);
+  const workerUrl=new URL('./vendor/bare-mux/worker.js',root).href;
+  const probeClient=new window.BareMux.BareClient(workerUrl);
+  const selectedKnownServer=WISP_SERVERS.find(server=>server.url===settings.server);
+  const candidates=settings.transport==='bare'
+    ?[{name:'Bare Server',url:settings.bareServer}]
+    :selectedKnownServer
+      ?[selectedKnownServer,...WISP_SERVERS.filter(server=>server.url!==settings.server)]
+      :[{name:'Mon serveur Wisp',url:settings.server}];
+  const failures=[];
+  let persistenceWarning='';
+  for(const candidate of candidates){
+    status.textContent=`Vérification de ${candidate.name}…`;
+    const args=settings.transport==='epoxy'
+      ?[{wisp:candidate.url}]
+      :settings.transport==='libcurl'
+        ?[{wisp:candidate.url,websocket:candidate.url}]
+        :[candidate.url];
+    try{
+      await bareMux.setManualTransport(adapter,args);
+      const controller=new AbortController();
+      let timeout;
+      try{
+        await Promise.race([
+          probeClient.fetch(targetUrl,{signal:controller.signal}),
+          new Promise((_,reject)=>{timeout=setTimeout(()=>reject(new Error('Délai de connexion au serveur proxy dépassé.')),8000)})
+        ]);
+      }finally{
+        clearTimeout(timeout);
+        controller.abort();
+      }
+      network={...settings,server:candidate.url};
+      $('#wisp-server').value=selectedServer();
+      $('#custom-wisp').value=selectedServer()==='custom'?network.server:'';
+      try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(network))}
+      catch(error){
+        persistenceWarning='Le serveur fonctionne, mais son adresse n’a pas pu être mémorisée.';
+        console.error('Impossible de mémoriser le serveur proxy actif.',error);
+      }
+      return persistenceWarning;
+    }catch(error){
+      failures.push(`${candidate.name}: ${error.message||String(error)}`);
+      console.warn(`Le serveur proxy ${candidate.name} ne répond pas, essai du suivant.`,error);
+    }
+  }
+  throw new Error(`Aucun serveur proxy n’a répondu. ${failures.join(' | ')}`);
 }
 function showCurrentUrl(url){
   try{input.value=new URL(String(url)).href}catch{}
@@ -261,9 +301,9 @@ async function navigate(target,addToHistoryEntry=true){
   status.textContent='Connexion au proxy et chargement de la page…';
   $('#save-network').disabled=true;
   try{
-    await initializeProxy();
+    const persistenceWarning=await initializeProxy(resolved);
     createProxyFrame().go(resolved);
-    status.textContent=`Transport ${TRANSPORTS[network.transport].name} — ${network.transport==='bare'?'Bare Server personnalisé':WISP_SERVERS.find(server=>server.url===network.server)?.name||network.server}`;
+    status.textContent=`Transport ${TRANSPORTS[network.transport].name} — ${network.transport==='bare'?'Bare Server personnalisé':WISP_SERVERS.find(server=>server.url===network.server)?.name||network.server}${persistenceWarning?` — ${persistenceWarning}`:''}`;
   }catch(e){
     status.textContent='';
     error.textContent=e.message||'Impossible d’initialiser le proxy.';
