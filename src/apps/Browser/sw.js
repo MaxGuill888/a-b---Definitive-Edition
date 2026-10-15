@@ -2,6 +2,7 @@ importScripts("./vendor/scramjet/scramjet.all.js");
 
 const {ScramjetServiceWorker}=self.$scramjetLoadWorker();
 const scramjet=new ScramjetServiceWorker();
+const proxyPrefix=new URL('proxy/',self.registration.scope).href;
 
 async function restoreEscapedHtml(response,request){
   const isDocument=['document','iframe'].includes(request.destination)||request.mode==='navigate';
@@ -46,6 +47,7 @@ self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
 self.addEventListener('fetch',event=>{
   event.respondWith((async()=>{
     try{
+      if(!event.request.url.startsWith(proxyPrefix))return await fetch(event.request);
       await scramjet.loadConfig();
       if(!scramjet.config?.prefix||!scramjet.config?.files?.wasm)
         throw new Error('La configuration Scramjet est absente. Recharge l’application Navigateur puis réessaie.');

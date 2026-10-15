@@ -191,6 +191,63 @@ async function waitForController(){
     navigator.serviceWorker.addEventListener('controllerchange',onChange);
   });
 }
+const SCRAMJET_STORES=['config','cookies','redirectTrackers','referrerPolicies','publicSuffixList'];
+function openScramjetDatabase(){
+  return new Promise((resolve,reject)=>{
+    const request=indexedDB.open('$scramjet',1);
+    request.addEventListener('upgradeneeded',()=>{
+      const database=request.result;
+      for(const store of SCRAMJET_STORES)
+        if(!database.objectStoreNames.contains(store))database.createObjectStore(store);
+    });
+    request.addEventListener('success',()=>resolve(request.result),{once:true});
+    request.addEventListener('error',()=>reject(request.error),{once:true});
+  });
+}
+function readScramjetStore(database,name){
+  return new Promise((resolve,reject)=>{
+    const transaction=database.transaction(name,'readonly');
+    const store=transaction.objectStore(name);
+    const keys=store.getAllKeys(),values=store.getAll();
+    transaction.addEventListener('complete',()=>resolve(keys.result.map((key,index)=>[key,values.result[index]])),{once:true});
+    transaction.addEventListener('error',()=>reject(transaction.error),{once:true});
+    transaction.addEventListener('abort',()=>reject(transaction.error||new Error(`Impossible de lire le magasin Scramjet ${name}.`)),{once:true});
+  });
+}
+async function ensureScramjetDatabase(){
+  let database=await openScramjetDatabase();
+  const existing=SCRAMJET_STORES.filter(store=>database.objectStoreNames.contains(store));
+  if(existing.length===SCRAMJET_STORES.length){database.close();return}
+
+  const saved=new Map();
+  try{
+    for(const store of existing)saved.set(store,await readScramjetStore(database,store));
+  }finally{database.close()}
+
+  await new Promise((resolve,reject)=>{
+    const request=indexedDB.deleteDatabase('$scramjet');
+    let blockedTimer;
+    request.addEventListener('success',()=>{
+      clearTimeout(blockedTimer);
+      resolve();
+    },{once:true});
+    request.addEventListener('error',()=>reject(request.error),{once:true});
+    request.addEventListener('blocked',()=>{
+      blockedTimer=setTimeout(()=>reject(new Error('La base Scramjet endommagée reste ouverte. Ferme les autres onglets de l’application puis réessaie.')),10000);
+    },{once:true});
+  });
+  database=await openScramjetDatabase();
+  try{
+    const transaction=database.transaction(SCRAMJET_STORES,'readwrite');
+    for(const [name,records] of saved)
+      for(const [key,value] of records)transaction.objectStore(name).put(value,key);
+    await new Promise((resolve,reject)=>{
+      transaction.addEventListener('complete',resolve,{once:true});
+      transaction.addEventListener('error',()=>reject(transaction.error),{once:true});
+      transaction.addEventListener('abort',()=>reject(transaction.error||new Error('Impossible de restaurer les données Scramjet conservées.')),{once:true});
+    });
+  }finally{database.close()}
+}
 async function initializeProxy(targetUrl){
   ensureSecureContext();
   const settings=readNetworkSettings();
@@ -198,17 +255,20 @@ async function initializeProxy(targetUrl){
     const root=new URL('./',location.href);
     const rootPath=root.pathname;
     const {ScramjetController}=window.$scramjetLoadController();
-    proxyController=new ScramjetController({prefix:`${rootPath}proxy/`,files:{
+    const controller=new ScramjetController({prefix:`${rootPath}proxy/`,files:{
       wasm:new URL('./vendor/scramjet/scramjet.wasm.wasm',root).href,
       all:new URL('./vendor/scramjet/scramjet.all.js',root).href,
       sync:new URL('./vendor/scramjet/scramjet.sync.js',root).href
     }});
+    await ensureScramjetDatabase();
+    await controller.init();
     const workerUrl=new URL('./sw.js',root);
     await navigator.serviceWorker.register(workerUrl.href,{scope:rootPath});
     await navigator.serviceWorker.ready;
     await waitForController();
-    await proxyController.init();
-    bareMux=new window.BareMux.BareMuxConnection(new URL('./vendor/bare-mux/worker.js',root).href);
+    const mux=new window.BareMux.BareMuxConnection(new URL('./vendor/bare-mux/worker.js',root).href);
+    proxyController=controller;
+    bareMux=mux;
   }
   const transport=TRANSPORTS[settings.transport];
   const moduleUrl=JSON.stringify(transport.url);
