@@ -13,6 +13,9 @@ html,body{height:100%;overflow:hidden;background:#111;color:var(--fg);font-famil
 [data-theme=light] #wp{filter:invert(1)}
 #stage{position:absolute;left:50%;top:50%;width:1366px;height:768px;margin:-384px 0 0 -683px;transform-origin:center}
 .cell{position:absolute;width:92px;height:92px}
+.cell.running .tile{box-shadow:0 0 0 2px var(--fg)}
+.cell.running::after{content:"";position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--fg)}
+.cell.minimized::after{background:var(--mut)}
 .cell.g{transform:scale(.78);transform-origin:46px 46px}
 .cell span{position:absolute;top:101px;left:50%;transform:translateX(-50%);width:150px;text-align:center;font-size:18px;line-height:24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 .cell.dragging{z-index:50}.cell.dragging .tile{box-shadow:0 8px 24px rgba(0,0,0,.5);transition:none;cursor:grabbing}
@@ -35,6 +38,7 @@ button.tile:active{transform:scale(.95)}
 /* fenêtres */
 #layer{position:fixed;inset:0;pointer-events:none}
 .win{position:fixed;left:0;top:0;transform:scale(var(--z));transform-origin:0 0;pointer-events:auto;display:flex;flex-direction:column;background:var(--win);border:1px solid var(--bd);border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.45);font-size:12px}
+.win[hidden]{display:none}
 .win.max{border-radius:0;border:0}
 .tb{height:24px;flex:none;display:flex;align-items:center;padding:0 6px 0 11px;touch-action:none}
 .tt{flex:1;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -114,7 +118,7 @@ function slots(all){
 }
 let suppress=false;
 function cell(a,p,slot){
- const c=document.createElement('div');c.className='cell'+(p.dock?'':' g');c.style.left=p.x+'px';c.style.top=p.y+'px';
+ const c=document.createElement('div');c.className='cell'+(p.dock?'':' g');c.dataset.appId=a.id;c.style.left=p.x+'px';c.style.top=p.y+'px';
  c.innerHTML=`<button class="tile" aria-label="${esc(a.name)}">${iconHTML(a)}</button>${p.dock?'':`<span>${esc(a.name)}</span>`}`;
  const b=c.firstChild;
  b.onclick=()=>{if(!suppress)openApp(a)};
@@ -145,6 +149,7 @@ function render(){
  const n=document.createElement('div');n.id='nc';n.className='cell';
  n.innerHTML=`<button class="tile" aria-label="Centre de notifications">${BELL}</button>${unread?'<i class="dot"></i>':''}`;
  n.firstChild.onclick=e=>{e.stopPropagation();toggleNP()};dw.append(n);clock();
+ updateRunningApps();
 }
 function clock(){
  const d=new Date(),p=x=>String(x).padStart(2,'0');let h=d.getHours();if(!cfg.h24)h=h%12||12;
@@ -165,6 +170,16 @@ function toast(t){const e=document.createElement('div');e.className='toast';e.te
 /* ---------- fenêtres ---------- */
 const wins={};let zi=10,nwin=0;
 const MINW=360,MINH=220;
+function updateRunningApps(){
+ document.querySelectorAll('.cell[data-app-id]').forEach(icon=>{
+  const win=wins[icon.dataset.appId];
+  const running=!!win;
+  icon.classList.toggle('running',running);
+  icon.classList.toggle('minimized',running&&win.el.hidden);
+  const app=[...BUILTIN,...apps].find(item=>item.id===icon.dataset.appId);
+  if(app)icon.querySelector('.tile')?.setAttribute('aria-label',`${app.name}${running?(win.el.hidden?' (réduite)':' (ouverte)'):''}`);
+ });
+}
 function place(w){
  const s=w.el.style;
  if(w.max){s.left=s.top='0';s.width=innerWidth/Z+'px';s.height=innerHeight/Z+'px'}
@@ -186,7 +201,7 @@ function drag(e,w,mode){
  addEventListener('pointermove',mv);addEventListener('pointerup',up);addEventListener('pointercancel',up);
 }
 function openWin(key,title,extra=''){
- if(wins[key]){const w=wins[key];w.el.hidden=false;focus(w);return null}
+ if(wins[key]){const w=wins[key];w.el.hidden=false;focus(w);updateRunningApps();return null}
  const el=document.createElement('div');el.className='win';el.setAttribute('role','dialog');el.setAttribute('aria-label',title);
  el.innerHTML=`<div class="tb"><span class="tt">${esc(title)}</span>${extra}
  <button class="zapb" aria-label="Zappeur d'éléments" title="Zappeur d'éléments (clic droit : rechercher)"${cfg.zap?'':' hidden'}><svg viewBox="0 0 10 10"><path d="M6.2.4L1.8 5.6h2.4L3.6 9.6l4.6-5.4H5.8z"/></svg></button>
@@ -201,12 +216,12 @@ function openWin(key,title,extra=''){
  el.querySelector('.tb').onpointerdown=e=>{if(!e.target.closest('button'))drag(e,w,'move')};
  el.querySelector('.tb').ondblclick=e=>{if(!e.target.closest('button'))tog()};
  el.onpointerdown=()=>focus(w);
- el.querySelector('[data-a=min]').onclick=()=>el.hidden=true;
+ el.querySelector('[data-a=min]').onclick=()=>{el.hidden=true;updateRunningApps()};
  el.querySelector('[data-a=max]').onclick=tog;
  el.querySelector('[data-a=x]').onclick=()=>closeWin(key);
- place(w);focus(w);return el.querySelector('.wb');
+ place(w);focus(w);updateRunningApps();return el.querySelector('.wb');
 }
-function closeWin(id){if(wins[id]){wins[id].el.remove();delete wins[id];zapSync()}}
+function closeWin(id){if(wins[id]){wins[id].el.remove();delete wins[id];zapSync();updateRunningApps()}}
 const PERMS='fullscreen; pointer-lock; keyboard-map; gamepad; autoplay; clipboard-read; clipboard-write; microphone; camera; accelerometer; gyroscope; encrypted-media; web-share';
 const SBOX='allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads allow-pointer-lock allow-presentation allow-orientation-lock';
 function openApp(a){

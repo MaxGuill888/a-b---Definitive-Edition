@@ -24,6 +24,23 @@ button{border:0;cursor:pointer}
 .network-row{display:flex;align-items:center;gap:8px}
 .network-row label{flex:1;min-width:0}
 .network-row select,.network-row input{max-width:240px}
+.settings-subtitle{margin:4px 0 0;font-weight:600}
+.transport-options{display:flex;gap:6px;flex-wrap:wrap}
+.transport-option,.wisp-option,.settings-icon-btn,.settings-action-btn{background:var(--field);border:1px solid var(--bd);border-radius:7px;color:var(--fg)}
+.transport-option{padding:5px 10px}
+.transport-option.active,.wisp-option.active{border-color:var(--link);box-shadow:inset 0 0 0 1px var(--link)}
+.wisp-list{display:flex;flex-direction:column;gap:5px;max-height:120px;overflow:auto}
+.wisp-option{display:flex;align-items:center;gap:8px;text-align:left;padding:6px 8px}
+.wisp-select{display:flex;flex:1;flex-direction:column;gap:2px;min-width:0;padding:0;background:transparent;color:inherit;text-align:left}
+.wisp-option-name{flex:1;min-width:0;overflow-wrap:anywhere}
+.wisp-option-url{color:var(--mut);font-size:10px;overflow-wrap:anywhere}
+.server-status{color:var(--mut);font-size:10px;white-space:nowrap}
+.server-status.online{color:#62c68b}
+.server-status.offline{color:#ff8c82}
+.settings-icon-btn{width:30px;flex:none}
+.settings-action-btn{align-self:flex-start;padding:5px 9px}
+.custom-server-form{display:flex;gap:6px}
+.custom-server-form input{flex:1;max-width:none}
 .hint{color:var(--mut);font-size:10.5px;line-height:1.45}
 .providers{display:flex;gap:6px;flex-wrap:wrap}
 .providers a{background:var(--field);color:var(--fg);text-decoration:none;border-radius:7px;padding:5px 8px}
@@ -49,20 +66,17 @@ button{border:0;cursor:pointer}
 <details class="panel" id="network-panel">
   <summary>Réseau — YukiOS</summary>
   <div class="network">
-    <div class="network-row" id="wisp-server-row">
-      <label class="hint" for="wisp-server">Serveur Wisp</label>
-      <select id="wisp-server" aria-label="Serveur Wisp">
-        <option value="wss://probuildingsupplies.com/w/">Probuilding Wisp</option>
-        <option value="wss://wisp.mercurywork.shop/">Mercury Wisp</option>
-        <option value="wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/">Reeyuki Wisp</option>
-        <option value="custom">Mon serveur Wisp…</option>
-      </select>
-    </div>
-    <label class="network-row" id="custom-wisp-row" hidden>
-      <span class="hint">URL Wisp personnalisée</span>
-      <input id="custom-wisp" type="url" placeholder="wss://mon-serveur.example/w/" autocomplete="url">
-    </label>
-    <div class="network-row"><span class="hint">Transport Epoxy/Wisp (configuration YukiOS).</span><button class="primary" id="save-network" type="button">Appliquer</button></div>
+    <div class="settings-subtitle">Transport</div>
+    <div class="transport-options" id="transport-options" role="group" aria-label="Transport réseau"></div>
+    <div class="settings-subtitle">Serveur Wisp</div>
+    <div class="wisp-list" id="wisp-list" role="radiogroup" aria-label="Serveur Wisp"></div>
+    <div class="settings-subtitle">Serveur personnalisé</div>
+    <form class="custom-server-form" id="custom-server-form">
+      <input id="custom-wisp" type="url" placeholder="wss://mon-serveur.example/w/" aria-label="URL du serveur Wisp personnalisé" autocomplete="url" required>
+      <button class="settings-icon-btn" type="submit" aria-label="Ajouter ce serveur Wisp" title="Ajouter">+</button>
+    </form>
+    <button class="settings-action-btn" id="repair-proxy" type="button">Réparer le proxy</button>
+    <p class="hint">Choisis le transport et un serveur Wisp compatible. Les changements sont appliqués immédiatement.</p>
     <p class="hint">Les serveurs Wisp publics peuvent changer ou être indisponibles. Tu peux saisir un serveur compatible que tu contrôles.</p>
     <p class="notice">Un proxy peut voir les domaines visités et le trafic qu’il relaie. N’y saisis pas d’informations sensibles. La compatibilité des sites varie.</p>
   </div>
@@ -80,38 +94,153 @@ const WISP_SERVERS=[
   {name:'Mercury Wisp',url:'wss://wisp.mercurywork.shop/'},
   {name:'Reeyuki Wisp',url:'wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/'}
 ];
-let network={transport:'epoxy',server:DEFAULT_SERVER,bareServer:''};
-let proxyFrame=null,proxyReady=false,proxyServer='',pendingNavigation='',history=[],historyIndex=-1;
+let network={transport:'epoxy',server:DEFAULT_SERVER,customServers:[]};
+let proxyFrame=null,proxyReady=false,proxyServer='',proxyTransport='',pendingNavigation='',history=[],historyIndex=-1;
 
 try{document.documentElement.dataset.theme=parent.OS?.cfg?.theme||'dark'}
 catch{document.documentElement.dataset.theme='dark'}
-try{network=Object.assign(network,JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'))}
+try{
+  const saved=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}');
+  if(saved&&typeof saved==='object'&&!Array.isArray(saved)){
+    if(saved.transport==='epoxy'||saved.transport==='libcurl')network.transport=saved.transport;
+    if(typeof saved.server==='string')network.server=saved.server;
+    if(Array.isArray(saved.customServers)){
+      const known=new Set(WISP_SERVERS.map(server=>server.url));
+      network.customServers=saved.customServers.filter(server=>{
+        if(!server||typeof server.name!=='string'||typeof server.url!=='string')return false;
+        try{
+          const url=new URL(server.url);
+          if(!['wss:','ws:'].includes(url.protocol)||(location.protocol==='https:'&&url.protocol!=='wss:'))return false;
+          const normalized=url.href;
+          if(known.has(normalized))return false;
+          known.add(normalized);
+          server.url=normalized;
+          return true;
+        }catch{return false}
+      });
+    }
+  }
+}
 catch{error.textContent='Les réglages réseau enregistrés sont illisibles ; les valeurs par défaut sont utilisées.'}
-
-function selectedServer(){return WISP_SERVERS.some(server=>server.url===network.server)?network.server:'custom'}
-function updateNetworkFields(){
-  $('#custom-wisp-row').hidden=$('#wisp-server').value!=='custom';
-}
-$('#wisp-server').value=selectedServer();
-$('#custom-wisp').value=selectedServer()==='custom'?network.server:'';
-updateNetworkFields();
-$('#wisp-server').addEventListener('change',updateNetworkFields);
-function readNetworkSettings(){
-  const rawServer=$('#wisp-server').value==='custom'?$('#custom-wisp').value.trim():$('#wisp-server').value;
-  let server;
-  try{server=new URL(rawServer)}catch{throw new Error('Entre une adresse Wisp valide.')}
-  if(!['wss:','ws:'].includes(server.protocol))throw new Error('Le serveur Wisp doit utiliser ws:// ou wss://.');
-  if(location.protocol==='https:'&&server.protocol!=='wss:')throw new Error('Une page HTTPS exige un serveur Wisp sécurisé en wss://.');
-  return{...network,transport:'epoxy',server:server.href};
-}
-$('#save-network').addEventListener('click',()=>{
+if(typeof network.server==='string'&&!allServers().some(server=>server.url===network.server)){
   try{
-    network=readNetworkSettings();
-    localStorage.setItem(SETTINGS_KEY,JSON.stringify(network));
-    error.textContent='';
-    status.textContent=`Serveur Wisp enregistré : ${network.server}`;
-    if(historyIndex>=0)navigate(history[historyIndex],false,true);
+    const savedServer=new URL(network.server);
+    if(!['wss:','ws:'].includes(savedServer.protocol)||(location.protocol==='https:'&&savedServer.protocol!=='wss:'))throw new Error('Invalid Wisp URL');
+    network.server=savedServer.href;
+    if(!allServers().some(server=>server.url===network.server))network.customServers.push({name:'Serveur personnalisé',url:network.server});
+  }catch{network.server=DEFAULT_SERVER}
+}
+
+function allServers(){return WISP_SERVERS.concat(network.customServers)}
+function persistNetwork(next,changedMessage){
+  try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(next))}
+  catch(e){error.textContent=`Impossible d’enregistrer les réglages réseau : ${e.message||e}`;return false}
+  network=next;
+  error.textContent='';
+  renderNetworkSettings();
+  status.textContent=changedMessage;
+  if(historyIndex>=0)navigate(history[historyIndex],false,true);
+  return true;
+}
+function renderNetworkSettings(){
+  const transportOptions=$('#transport-options');
+  transportOptions.replaceChildren();
+  for(const transport of [{id:'epoxy',label:'Epoxy'},{id:'libcurl',label:'libcurl'}]){
+    const button=document.createElement('button');
+    button.type='button';
+    button.className='transport-option'+(network.transport===transport.id?' active':'');
+    button.setAttribute('aria-pressed',String(network.transport===transport.id));
+    button.textContent=transport.label;
+    button.addEventListener('click',()=>persistNetwork({...network,transport:transport.id},`Transport ${transport.label} sélectionné.`));
+    transportOptions.append(button);
+  }
+  const list=$('#wisp-list');
+  list.replaceChildren();
+  for(const server of allServers()){
+    const option=document.createElement('div');
+    option.className='wisp-option'+(network.server===server.url?' active':'');
+    const select=document.createElement('button');
+    select.type='button';
+    select.className='wisp-select';
+    select.setAttribute('role','radio');
+    select.setAttribute('aria-checked',String(network.server===server.url));
+    const name=document.createElement('span');
+    name.className='wisp-option-name';
+    name.textContent=server.name;
+    const url=document.createElement('span');
+    url.className='wisp-option-url';
+    url.textContent=server.url;
+    select.append(name,url);
+    select.addEventListener('click',()=>persistNetwork({...network,server:server.url},`Serveur Wisp sélectionné : ${server.name}.`));
+    const health=document.createElement('span');
+    health.className='server-status';
+    health.textContent='Non vérifié';
+    option.dataset.serverUrl=server.url;
+    option.append(select,health);
+    if(network.customServers.some(custom=>custom.url===server.url)){
+      const remove=document.createElement('button');
+      remove.type='button';
+      remove.className='settings-icon-btn';
+      remove.textContent='×';
+      remove.setAttribute('aria-label',`Supprimer ${server.name}`);
+      remove.addEventListener('click',()=>{
+        const customServers=network.customServers.filter(custom=>custom.url!==server.url);
+        persistNetwork({...network,server:network.server===server.url?DEFAULT_SERVER:network.server,customServers},'Serveur Wisp personnalisé supprimé.');
+      });
+      option.append(remove);
+    }
+    list.append(option);
+  }
+  if($('#network-panel').open)refreshServerHealth();
+}
+function checkWispHealth(url,timeoutMs=5000){
+  return new Promise(resolve=>{
+    const started=performance.now();
+    let socket,finished=false;
+    const timer=setTimeout(()=>finish(false),timeoutMs);
+    function finish(ok){
+      if(finished)return;
+      finished=true;
+      clearTimeout(timer);
+      socket?.close();
+      resolve({ok,ms:Math.round(performance.now()-started)});
+    }
+    try{
+      socket=new WebSocket(url);
+      socket.addEventListener('open',()=>finish(true),{once:true});
+      socket.addEventListener('error',()=>finish(false),{once:true});
+    }catch{finish(false)}
+  });
+}
+async function refreshServerHealth(){
+  const options=[...$('#wisp-list').children];
+  await Promise.all(options.map(async option=>{
+    const health=option.querySelector('.server-status');
+    const result=await checkWispHealth(option.dataset.serverUrl);
+    if(!health?.isConnected)return;
+    health.classList.toggle('online',result.ok);
+    health.classList.toggle('offline',!result.ok);
+    health.textContent=result.ok?`${result.ms} ms`:'Hors ligne';
+  }));
+}
+renderNetworkSettings();
+$('#network-panel').addEventListener('toggle',()=>{if($('#network-panel').open)refreshServerHealth()});
+$('#custom-server-form').addEventListener('submit',event=>{
+  event.preventDefault();
+  try{
+    const server=new URL($('#custom-wisp').value.trim());
+    if(!['wss:','ws:'].includes(server.protocol))throw new Error('Le serveur Wisp doit utiliser ws:// ou wss://.');
+    if(location.protocol==='https:'&&server.protocol!=='wss:')throw new Error('Une page HTTPS exige un serveur Wisp sécurisé en wss://.');
+    const url=server.href;
+    if(allServers().some(item=>item.url===url))throw new Error('Ce serveur Wisp est déjà dans la liste.');
+    const customServers=[...network.customServers,{name:`Custom ${network.customServers.length+1}`,url}];
+    if(persistNetwork({...network,server:url,customServers},`Serveur Wisp personnalisé ajouté : ${url}`))$('#custom-wisp').value='';
   }catch(e){error.textContent=e.message}
+});
+$('#repair-proxy').addEventListener('click',()=>{
+  if(historyIndex>=0)navigate(history[historyIndex],false,true);
+  else if(proxyFrame)createProxyFrame(proxyFrame.src);
+  else status.textContent='Les réglages sont prêts. Ouvre une adresse pour démarrer le proxy.';
 });
 
 function resolveAddress(value){
@@ -150,11 +279,13 @@ function createProxyFrame(targetUrl){
   ensureSecureContext();
   proxyReady=false;
   proxyServer=network.server;
+  proxyTransport=network.transport;
   pendingNavigation=targetUrl;
   proxyFrame=document.createElement('iframe');
   proxyFrame.title='Navigateur YukiOS';
   const hostUrl=new URL('./yukios-host.html',location.href);
   hostUrl.searchParams.set('wisp',network.server);
+  hostUrl.searchParams.set('transport',network.transport);
   hostUrl.searchParams.set('target',targetUrl);
   proxyFrame.src=hostUrl.href;
   $('#frame-host').replaceChildren(proxyFrame);
@@ -168,7 +299,7 @@ function navigate(target,addToHistoryEntry=true,restartProxy=false){
   pendingNavigation=resolved;
   status.textContent='Chargement du navigateur YukiOS…';
   try{
-    if(restartProxy||!proxyFrame||proxyServer!==network.server)createProxyFrame(resolved);
+    if(restartProxy||!proxyFrame||proxyServer!==network.server||proxyTransport!==network.transport)createProxyFrame(resolved);
     else if(!sendHostMessage({type:'yukios-browser:navigate',url:resolved}))status.textContent='Attente du moteur YukiOS…';
   }catch(e){
     error.textContent=e.message||'Impossible d’initialiser le proxy.';
@@ -180,7 +311,7 @@ window.addEventListener('message',event=>{
   const message=event.data;
   if(message?.type==='yukios-browser:ready'){
     proxyReady=true;
-    status.textContent=`Navigateur YukiOS — ${WISP_SERVERS.find(server=>server.url===proxyServer)?.name||proxyServer}`;
+    status.textContent=`Navigateur YukiOS — ${network.transport==='epoxy'?'Epoxy':'libcurl'} — ${allServers().find(server=>server.url===proxyServer)?.name||proxyServer}`;
     if(pendingNavigation&&message.url!==pendingNavigation)sendHostMessage({type:'yukios-browser:navigate',url:pendingNavigation});
   }else if(message?.type==='yukios-browser:url'){
     showCurrentUrl(message.url);
@@ -210,6 +341,7 @@ $('#open-tab').addEventListener('click',()=>{
   if(historyIndex<0)return;
   const hostUrl=new URL('./yukios-host.html',location.href);
   hostUrl.searchParams.set('wisp',network.server);
+  hostUrl.searchParams.set('transport',network.transport);
   hostUrl.searchParams.set('target',history[historyIndex]);
   window.open(hostUrl.href,'_blank','noopener,noreferrer');
 });

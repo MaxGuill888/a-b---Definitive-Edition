@@ -43,11 +43,15 @@
       window.addEventListener("unhandledrejection", (event) => reportYukiBrowserError(event.reason));
     </script>
     <script type="module">
-      import { default as EpoxyTransport } from "https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@3.0.1/dist/index.mjs";
-
       const urlParams = new URLSearchParams(window.location.search);
       const DEFAULT_WISP_URL = "wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/";
       const WISP_URL = urlParams.get("wisp") || DEFAULT_WISP_URL;
+      const requestedTransport = urlParams.get("transport");
+      const TRANSPORTS = {
+        epoxy: "https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@3.0.1/dist/index.mjs",
+        libcurl: "https://cdn.jsdelivr.net/npm/@mercuryworkshop/libcurl-transport@2.0.5/dist/index.mjs"
+      };
+      const TRANSPORT = Object.hasOwn(TRANSPORTS, requestedTransport) ? requestedTransport : "epoxy";
       const TARGET_URL = urlParams.get("target") || "https://example.com";
 
       let basePath = location.pathname.replace(/[^/]*$/, "");
@@ -70,7 +74,12 @@
         throw new Error("YukiOS browser service worker did not take control of this page.");
       }
 
-      const rawTransport = new EpoxyTransport({ wisp: WISP_URL });
+      const { default: Transport } = await import(TRANSPORTS[TRANSPORT]);
+      const rawTransport = new Transport(
+        TRANSPORT === "epoxy"
+          ? { wisp: WISP_URL }
+          : { wisp: WISP_URL, websocket: WISP_URL }
+      );
 
       const transport = {
         get ready() {

@@ -5,3 +5,8 @@ License: MIT (see LICENSE).
 
 The browser host imports Epoxy Transport from jsDelivr at runtime:
 @mercuryworkshop/epoxy-transport 3.0.1
+
+The browser host also imports libcurl Transport from jsDelivr when selected:
+@mercuryworkshop/libcurl-transport 2.0.5 (AGPL-3.0-only)
+https://github.com/MercuryWorkshop/CurlTransport
+https://github.com/MercuryWorkshop/CurlTransport/blob/main/LICENSE

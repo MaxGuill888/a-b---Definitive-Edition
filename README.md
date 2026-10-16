@@ -131,7 +131,7 @@ L'App Store permet d'ajouter des liens ou fichiers HTML en tant qu'applications 
 La section Paramètres permet de personnaliser l'apparence globale du bureau et de gérer les apps installées.
 
 ### Navigateur
-Le Navigateur reprend l’intégration Scramjet/Wisp du navigateur YukiOS : son contrôleur, son service worker, son transport Epoxy et sa page hôte locale sont fournis avec l’application. Il propose les serveurs Wisp publics de YukiOS et l’utilisation d’une adresse Wisp personnelle compatible.
+Le Navigateur reprend l’intégration Scramjet/Wisp du navigateur YukiOS : son contrôleur, son service worker et sa page hôte locale sont fournis avec l’application. Les réglages réseau reprennent les options YukiOS : transports Epoxy ou libcurl, sélection d’un serveur Wisp public, vérification de disponibilité, ajout/suppression de serveurs personnalisés et réparation du proxy. Les choix sont sauvegardés localement et appliqués en redémarrant le moteur sur la page courante.
 
 Le proxy nécessite un contexte sécurisé (HTTPS, par exemple GitHub Pages, ou `localhost`) : il ne fonctionne pas depuis `file://` ni depuis l'installateur local qui ouvre une page `blob:`. Les serveurs publics sont tiers ; disponibilité, latence et règles d'utilisation peuvent changer. Un proxy peut voir les domaines visités et le trafic qu'il relaie : ne saisis pas d'informations sensibles sur un serveur auquel tu ne fais pas confiance. Scramjet ne garantit pas la compatibilité de tous les sites.
 
@@ -166,8 +166,6 @@ a:b Definitive Edition vise à fournir une interface web unique, intuitive et pe
 Version du projet : Final Edition
 Type : Web UI / faux bureau / portail d'applications
 Technologies : HTML, CSS, JavaScript
-
-
 
 
 
