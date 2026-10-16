@@ -47,7 +47,7 @@ button{border:0;cursor:pointer}
   <button class="tool" id="open-tab" type="button" title="Ouvrir la page dans un nouvel onglet">↗</button>
 </form>
 <details class="panel" id="network-panel">
-  <summary>Réseau — Scramjet</summary>
+  <summary>Réseau — YukiOS</summary>
   <div class="network">
     <div class="network-row" id="wisp-server-row">
       <label class="hint" for="wisp-server">Serveur Wisp</label>
@@ -55,7 +55,6 @@ button{border:0;cursor:pointer}
         <option value="wss://probuildingsupplies.com/w/">Probuilding Wisp</option>
         <option value="wss://wisp.mercurywork.shop/">Mercury Wisp</option>
         <option value="wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/">Reeyuki Wisp</option>
-        <option value="wss://reeyukiwisp.onrender.com/">Reeyuki Wisp 2</option>
         <option value="custom">Mon serveur Wisp…</option>
       </select>
     </div>
@@ -63,97 +62,55 @@ button{border:0;cursor:pointer}
       <span class="hint">URL Wisp personnalisée</span>
       <input id="custom-wisp" type="url" placeholder="wss://mon-serveur.example/w/" autocomplete="url">
     </label>
-    <div class="network-row">
-      <label class="hint" for="transport">Transport</label>
-      <select id="transport" aria-label="Transport du proxy">
-        <option value="epoxy">Epoxy (Wisp)</option>
-        <option value="libcurl">libcurl (Wisp)</option>
-        <option value="bare">Bare Server</option>
-      </select>
-    </div>
-    <label class="network-row" id="bare-server-row" hidden>
-      <span class="hint">URL Bare Server</span>
-      <input id="bare-server" type="url" placeholder="https://mon-bare-server.example/" autocomplete="url">
-    </label>
-    <div class="network-row"><span class="hint" id="transport-hint">Transport WebSocket recommandé pour les serveurs Wisp.</span><button class="primary" id="save-network" type="button">Appliquer</button></div>
-    <p class="hint">Ces serveurs publics sont ceux listés par YukiOS. Leur disponibilité, leur vitesse et leurs règles d’utilisation peuvent changer ; configure un serveur que tu contrôles pour plus de fiabilité.</p>
-    <p class="notice">Un proxy peut voir les domaines visités et le trafic qu’il relaie. N’y saisis pas d’informations sensibles. Scramjet ne garantit pas que chaque site ou fonction sera compatible.</p>
+    <div class="network-row"><span class="hint">Transport Epoxy/Wisp (configuration YukiOS).</span><button class="primary" id="save-network" type="button">Appliquer</button></div>
+    <p class="hint">Les serveurs Wisp publics peuvent changer ou être indisponibles. Tu peux saisir un serveur compatible que tu contrôles.</p>
+    <p class="notice">Un proxy peut voir les domaines visités et le trafic qu’il relaie. N’y saisis pas d’informations sensibles. La compatibilité des sites varie.</p>
   </div>
 </details>
 <p class="error" id="error" role="status" aria-live="polite"></p>
-<p id="status" role="status" aria-live="polite">Le proxy se connectera lors de la première navigation.</p>
+<p id="status" role="status" aria-live="polite">Navigateur YukiOS — prêt à naviguer.</p>
 <div id="frame-host" aria-label="Page web"></div>
-<script src="./vendor/scramjet/scramjet.all.js"></script>
-<script src="./vendor/bare-mux/index.js"></script>
 <script>
 const $=selector=>document.querySelector(selector);
 const input=$('#url'),error=$('#error'),status=$('#status');
 const SETTINGS_KEY='browser-network-settings';
 const DEFAULT_SERVER='wss://probuildingsupplies.com/w/';
-const RETIRED_WISP_SERVERS=['wss://reeyukiwisp.onrender.com/'];
 const WISP_SERVERS=[
   {name:'Probuilding Wisp',url:DEFAULT_SERVER},
-  {name:'Reeyuki Wisp',url:'wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/'},
-  {name:'Mercury Wisp',url:'wss://wisp.mercurywork.shop/'}
+  {name:'Mercury Wisp',url:'wss://wisp.mercurywork.shop/'},
+  {name:'Reeyuki Wisp',url:'wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/'}
 ];
-const TRANSPORTS={
-  epoxy:{name:'Epoxy (Wisp)',url:'https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@3.0.1/dist/index.mjs'},
-  libcurl:{name:'libcurl (Wisp)',url:'https://cdn.jsdelivr.net/npm/@mercuryworkshop/libcurl-transport@2.0.5/dist/index.mjs'},
-  bare:{name:'Bare Server',url:'https://cdn.jsdelivr.net/npm/@mercuryworkshop/bare-as-module3@2.2.5/dist/index.mjs'}
-};
 let network={transport:'epoxy',server:DEFAULT_SERVER,bareServer:''};
-let proxyController=null,proxyFrame=null,bareMux=null,history=[],historyIndex=-1;
+let proxyFrame=null,proxyReady=false,proxyServer='',pendingNavigation='',history=[],historyIndex=-1;
 
 try{document.documentElement.dataset.theme=parent.OS?.cfg?.theme||'dark'}
 catch{document.documentElement.dataset.theme='dark'}
 try{network=Object.assign(network,JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'))}
 catch{error.textContent='Les réglages réseau enregistrés sont illisibles ; les valeurs par défaut sont utilisées.'}
-if(RETIRED_WISP_SERVERS.includes(network.server))network.server=DEFAULT_SERVER;
 
 function selectedServer(){return WISP_SERVERS.some(server=>server.url===network.server)?network.server:'custom'}
 function updateNetworkFields(){
-  const isBare=$('#transport').value==='bare';
-  $('#wisp-server-row').hidden=isBare;
-  $('#custom-wisp-row').hidden=isBare||$('#wisp-server').value!=='custom';
-  $('#bare-server-row').hidden=!isBare;
-  $('#transport-hint').textContent=$('#transport').value==='bare'
-    ?'Bare Server nécessite un serveur HTTP(S) compatible, à héberger ou fournir séparément.'
-    :'Transport WebSocket recommandé pour les serveurs Wisp.';
+  $('#custom-wisp-row').hidden=$('#wisp-server').value!=='custom';
 }
 $('#wisp-server').value=selectedServer();
 $('#custom-wisp').value=selectedServer()==='custom'?network.server:'';
-$('#transport').value=TRANSPORTS[network.transport]?network.transport:'epoxy';
-$('#bare-server').value=network.bareServer||'';
 updateNetworkFields();
 $('#wisp-server').addEventListener('change',updateNetworkFields);
-$('#transport').addEventListener('change',updateNetworkFields);
 function readNetworkSettings(){
-  const transport=$('#transport').value;
-  let server=network.server||DEFAULT_SERVER;
-  const bareServer=$('#bare-server').value.trim();
-  if(transport!=='bare'){
-    server=$('#wisp-server').value==='custom'?$('#custom-wisp').value.trim():$('#wisp-server').value;
-    let parsed;
-    try{parsed=new URL(server)}catch{throw new Error('Entre une adresse Wisp valide.')}
-    if(!['wss:','ws:'].includes(parsed.protocol))throw new Error('Le serveur Wisp doit utiliser ws:// ou wss://.');
-    if(location.protocol==='https:'&&parsed.protocol!=='wss:')throw new Error('Une page HTTPS exige un serveur Wisp sécurisé en wss://.');
-    server=parsed.href;
-  }
-  if(transport==='bare'){
-    let bare;
-    try{bare=new URL(bareServer)}catch{throw new Error('Entre une adresse Bare Server valide.')}
-    if(!['https:','http:'].includes(bare.protocol))throw new Error('Bare Server doit utiliser HTTP ou HTTPS.');
-    if(location.protocol==='https:'&&bare.protocol!=='https:')throw new Error('Une page HTTPS exige un Bare Server en HTTPS.');
-  }
-  return{transport,server,bareServer};
+  const rawServer=$('#wisp-server').value==='custom'?$('#custom-wisp').value.trim():$('#wisp-server').value;
+  let server;
+  try{server=new URL(rawServer)}catch{throw new Error('Entre une adresse Wisp valide.')}
+  if(!['wss:','ws:'].includes(server.protocol))throw new Error('Le serveur Wisp doit utiliser ws:// ou wss://.');
+  if(location.protocol==='https:'&&server.protocol!=='wss:')throw new Error('Une page HTTPS exige un serveur Wisp sécurisé en wss://.');
+  return{...network,transport:'epoxy',server:server.href};
 }
 $('#save-network').addEventListener('click',()=>{
   try{
     network=readNetworkSettings();
     localStorage.setItem(SETTINGS_KEY,JSON.stringify(network));
     error.textContent='';
-    status.textContent='Réglages réseau enregistrés. Ils seront utilisés à la prochaine navigation.';
-    if(historyIndex>=0)navigate(history[historyIndex],false);
+    status.textContent=`Serveur Wisp enregistré : ${network.server}`;
+    if(historyIndex>=0)navigate(history[historyIndex],false,true);
   }catch(e){error.textContent=e.message}
 });
 
@@ -179,160 +136,62 @@ function addHistory(url){
 }
 function ensureSecureContext(){
   if(!navigator.serviceWorker||!isSecureContext||location.protocol==='blob:')
-    throw new Error('Scramjet nécessite HTTPS (par exemple GitHub Pages) ou localhost : les service workers ne fonctionnent pas depuis un fichier ou un lien blob.');
-  if(!window.$scramjetLoadController||!window.BareMux?.BareMuxConnection)
-    throw new Error('Le moteur Scramjet ou BareMux n’a pas pu être chargé. Vérifie que les fichiers du navigateur sont présents.');
-}
-async function waitForController(registration,expectedScriptUrl){
-  const isControlledByActiveWorker=()=>registration.active?.state==='activated'
-    &&registration.active.scriptURL===expectedScriptUrl
-    &&navigator.serviceWorker.controller===registration.active;
-  if(isControlledByActiveWorker())return;
-  await new Promise((resolve,reject)=>{
-    const timer=setTimeout(()=>{
-      clearInterval(check);
-      reject(new Error('Le nouveau service worker Scramjet n’a pas pris le contrôle de cette page. Ferme les autres onglets puis recharge l’application.'));
-    },10000);
-    const check=setInterval(()=>{
-      if(!isControlledByActiveWorker())return;
-      clearTimeout(timer);
-      clearInterval(check);
-      resolve();
-    },50);
-  });
-}
-const SCRAMJET_DATABASE_NAME='$scramjet-browser-v3';
-function isolateScramjetDatabase(){
-  const factory=indexedDB;
-  const nativeOpen=factory.open.bind(factory);
-  Object.defineProperty(factory,'open',{
-    configurable:true,
-    value(name,...options){
-      return nativeOpen(name==='$scramjet'?SCRAMJET_DATABASE_NAME:name,...options);
-    }
-  });
-}
-async function initializeProxy(targetUrl){
-  ensureSecureContext();
-  const settings=readNetworkSettings();
-  if(!proxyController){
-    const root=new URL('./',location.href);
-    const rootPath=root.pathname;
-    const {ScramjetController}=window.$scramjetLoadController();
-    const controller=new ScramjetController({prefix:`${rootPath}proxy/`,files:{
-      wasm:new URL('./vendor/scramjet/scramjet.wasm.wasm',root).href,
-      all:new URL('./vendor/scramjet/scramjet.all.js',root).href,
-      sync:new URL('./vendor/scramjet/scramjet.sync.js',root).href
-    }});
-    isolateScramjetDatabase();
-    await controller.init();
-    const workerUrl=new URL('./sw.js?database=isolated-v3',root);
-    await navigator.serviceWorker.register(workerUrl.href,{scope:rootPath});
-    const registration=await navigator.serviceWorker.ready;
-    await waitForController(registration,workerUrl.href);
-    const mux=new window.BareMux.BareMuxConnection(new URL('./vendor/bare-mux/worker.js',root).href);
-    proxyController=controller;
-    bareMux=mux;
-  }
-  const transport=TRANSPORTS[settings.transport];
-  const moduleUrl=JSON.stringify(transport.url);
-  const transportName=JSON.stringify(transport.name);
-  const adapter=`
-    const {default: BaseTransport}=await import(${moduleUrl});
-    function normalizeHeaders(headers){
-      if(!headers)return [];
-      if(typeof headers[Symbol.iterator]==="function")return headers;
-      return Object.entries(headers);
-    }
-    class CompatibleTransport extends BaseTransport{
-      request(remote,method,body,headers,signal){
-        return super.request(remote,method,body,normalizeHeaders(headers),signal);
-      }
-      connect(url,protocols,headers,onopen,onmessage,onclose,onerror){
-        return super.connect(url,protocols,normalizeHeaders(headers),onopen,onmessage,onclose,onerror);
-      }
-    }
-    return [CompatibleTransport,${transportName}];
-  `;
-  const root=new URL('./',location.href);
-  const workerUrl=new URL('./vendor/bare-mux/worker.js',root).href;
-  const probeClient=new window.BareMux.BareClient(workerUrl);
-  const selectedKnownServer=WISP_SERVERS.find(server=>server.url===settings.server);
-  const candidates=settings.transport==='bare'
-    ?[{name:'Bare Server',url:settings.bareServer}]
-    :selectedKnownServer
-      ?[selectedKnownServer,...WISP_SERVERS.filter(server=>server.url!==settings.server)]
-      :[{name:'Mon serveur Wisp',url:settings.server}];
-  const failures=[];
-  let persistenceWarning='';
-  for(const candidate of candidates){
-    status.textContent=`Vérification de ${candidate.name}…`;
-    const args=settings.transport==='epoxy'
-      ?[{wisp:candidate.url}]
-      :settings.transport==='libcurl'
-        ?[{wisp:candidate.url,websocket:candidate.url}]
-        :[candidate.url];
-    try{
-      await bareMux.setManualTransport(adapter,args);
-      const controller=new AbortController();
-      let timeout;
-      try{
-        await Promise.race([
-          probeClient.fetch(targetUrl,{signal:controller.signal}),
-          new Promise((_,reject)=>{timeout=setTimeout(()=>reject(new Error('Délai de connexion au serveur proxy dépassé.')),8000)})
-        ]);
-      }finally{
-        clearTimeout(timeout);
-        controller.abort();
-      }
-      network={...settings,server:candidate.url};
-      $('#wisp-server').value=selectedServer();
-      $('#custom-wisp').value=selectedServer()==='custom'?network.server:'';
-      try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(network))}
-      catch(error){
-        persistenceWarning='Le serveur fonctionne, mais son adresse n’a pas pu être mémorisée.';
-        console.error('Impossible de mémoriser le serveur proxy actif.',error);
-      }
-      return persistenceWarning;
-    }catch(error){
-      failures.push(`${candidate.name}: ${error.message||String(error)}`);
-      console.warn(`Le serveur proxy ${candidate.name} ne répond pas, essai du suivant.`,error);
-    }
-  }
-  throw new Error(`Aucun serveur proxy n’a répondu. ${failures.join(' | ')}`);
+    throw new Error('Le navigateur YukiOS exige HTTPS (GitHub Pages) ou localhost pour utiliser le service worker.');
 }
 function showCurrentUrl(url){
   try{input.value=new URL(String(url)).href}catch{}
 }
-function createProxyFrame(){
-  if(proxyFrame)return proxyFrame;
-  proxyFrame=proxyController.createFrame();
-  proxyFrame.frame.title='Page web';
-  $('#frame-host').replaceChildren(proxyFrame.frame);
-  proxyFrame.addEventListener('urlchange',event=>{
-    const url=String(event.url);
-    showCurrentUrl(url);
-    addHistory(url);
-  });
-  return proxyFrame;
+function sendHostMessage(message){
+  if(!proxyFrame||!proxyReady)return false;
+  proxyFrame.contentWindow.postMessage(message,location.origin);
+  return true;
 }
-async function navigate(target,addToHistoryEntry=true){
+function createProxyFrame(targetUrl){
+  ensureSecureContext();
+  proxyReady=false;
+  proxyServer=network.server;
+  pendingNavigation=targetUrl;
+  proxyFrame=document.createElement('iframe');
+  proxyFrame.title='Navigateur YukiOS';
+  const hostUrl=new URL('./yukios-host.html',location.href);
+  hostUrl.searchParams.set('wisp',network.server);
+  hostUrl.searchParams.set('target',targetUrl);
+  proxyFrame.src=hostUrl.href;
+  $('#frame-host').replaceChildren(proxyFrame);
+}
+function navigate(target,addToHistoryEntry=true,restartProxy=false){
   error.textContent='';
   let resolved;
   try{resolved=resolveAddress(target);if(addToHistoryEntry)addHistory(resolved)}
   catch(e){error.textContent=e.message;return}
   input.value=resolved;
-  status.textContent='Connexion au proxy et chargement de la page…';
-  $('#save-network').disabled=true;
+  pendingNavigation=resolved;
+  status.textContent='Chargement du navigateur YukiOS…';
   try{
-    const persistenceWarning=await initializeProxy(resolved);
-    createProxyFrame().go(resolved);
-    status.textContent=`Transport ${TRANSPORTS[network.transport].name} — ${network.transport==='bare'?'Bare Server personnalisé':WISP_SERVERS.find(server=>server.url===network.server)?.name||network.server}${persistenceWarning?` — ${persistenceWarning}`:''}`;
+    if(restartProxy||!proxyFrame||proxyServer!==network.server)createProxyFrame(resolved);
+    else if(!sendHostMessage({type:'yukios-browser:navigate',url:resolved}))status.textContent='Attente du moteur YukiOS…';
   }catch(e){
-    status.textContent='';
     error.textContent=e.message||'Impossible d’initialiser le proxy.';
-  }finally{$('#save-network').disabled=false}
+    status.textContent='';
+  }
 }
+window.addEventListener('message',event=>{
+  if(event.origin!==location.origin||event.source!==proxyFrame?.contentWindow)return;
+  const message=event.data;
+  if(message?.type==='yukios-browser:ready'){
+    proxyReady=true;
+    status.textContent=`Navigateur YukiOS — ${WISP_SERVERS.find(server=>server.url===proxyServer)?.name||proxyServer}`;
+    if(pendingNavigation&&message.url!==pendingNavigation)sendHostMessage({type:'yukios-browser:navigate',url:pendingNavigation});
+  }else if(message?.type==='yukios-browser:url'){
+    showCurrentUrl(message.url);
+    addHistory(message.url);
+  }else if(message?.type==='yukios-browser:error'){
+    error.textContent=message.message||'Le navigateur YukiOS n’a pas pu démarrer.';
+    status.textContent='';
+  }else if(message?.type==='scramjet:popup-open'&&message.url){
+    navigate(message.url);
+  }
+});
 $('#nav').addEventListener('submit',event=>{event.preventDefault();navigate(input.value)});
 $('#back').addEventListener('click',()=>{
   if(historyIndex<=0)return;
@@ -346,11 +205,13 @@ $('#forward').addEventListener('click',()=>{
   setHistoryButtons();
   navigate(history[historyIndex],false);
 });
-$('#reload').addEventListener('click',()=>{if(proxyFrame)proxyFrame.reload()});
+$('#reload').addEventListener('click',()=>sendHostMessage({type:'yukios-browser:reload'}));
 $('#open-tab').addEventListener('click',()=>{
-  if(!proxyFrame||historyIndex<0)return;
-  try{window.open(new URL(proxyController.encodeUrl(history[historyIndex]),location.href).href,'_blank','noopener,noreferrer')}
-  catch(e){error.textContent=e.message}
+  if(historyIndex<0)return;
+  const hostUrl=new URL('./yukios-host.html',location.href);
+  hostUrl.searchParams.set('wisp',network.server);
+  hostUrl.searchParams.set('target',history[historyIndex]);
+  window.open(hostUrl.href,'_blank','noopener,noreferrer');
 });
 setHistoryButtons();
 </script>

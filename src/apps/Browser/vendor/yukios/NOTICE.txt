@@ -1,0 +1,7 @@
+The Scramjet browser runtime files in this directory are adapted from YukiOS.
+Upstream: https://github.com/Reeyuki/YukiOS
+Source revision: 2159f61286301e2bfeb275fc5ed7508fc991f656
+License: MIT (see LICENSE).
+
+The browser host imports Epoxy Transport from jsDelivr at runtime:
+@mercuryworkshop/epoxy-transport 3.0.1

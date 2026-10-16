@@ -131,11 +131,11 @@ L'App Store permet d'ajouter des liens ou fichiers HTML en tant qu'applications 
 La section Paramètres permet de personnaliser l'apparence globale du bureau et de gérer les apps installées.
 
 ### Navigateur
-Le Navigateur utilise Scramjet et un service worker pour relayer les requêtes, avec un choix de transport (Epoxy/Wisp, libcurl/Wisp ou Bare Server). Il propose les serveurs Wisp publics listés par YukiOS, ainsi que la saisie d'une adresse Wisp ou Bare Server personnelle. Avant la navigation, il vérifie le transport choisi et essaie les autres serveurs Wisp publics si celui-ci ne répond pas ; le serveur fonctionnel est alors mémorisé. Les modules de transport Epoxy, libcurl et Bare Server sont chargés depuis jsDelivr lors de leur sélection.
+Le Navigateur reprend l’intégration Scramjet/Wisp du navigateur YukiOS : son contrôleur, son service worker, son transport Epoxy et sa page hôte locale sont fournis avec l’application. Il propose les serveurs Wisp publics de YukiOS et l’utilisation d’une adresse Wisp personnelle compatible.
 
 Le proxy nécessite un contexte sécurisé (HTTPS, par exemple GitHub Pages, ou `localhost`) : il ne fonctionne pas depuis `file://` ni depuis l'installateur local qui ouvre une page `blob:`. Les serveurs publics sont tiers ; disponibilité, latence et règles d'utilisation peuvent changer. Un proxy peut voir les domaines visités et le trafic qu'il relaie : ne saisis pas d'informations sensibles sur un serveur auquel tu ne fais pas confiance. Scramjet ne garantit pas la compatibilité de tous les sites.
 
-Le runtime Scramjet et BareMux est fourni dans `src/apps/Browser/vendor/` avec ses fichiers de licence et d'attribution.
+Les fichiers adaptés du navigateur YukiOS sont sous licence MIT ; leur licence et l’attribution upstream figurent dans `src/apps/Browser/vendor/yukios/`. Le navigateur YukiOS upstream est disponible sur [Reeyuki/YukiOS](https://github.com/Reeyuki/YukiOS).
 
 ## Notes de conception
 
@@ -149,7 +149,7 @@ Le runtime Scramjet et BareMux est fourni dans `src/apps/Browser/vendor/` avec s
 - Il ne s'agit pas d'un système d'exploitation complet
 - Les pages d'AI et de Chat sont des modules de base et peuvent être enrichis
 - Les applications installées sont principalement des fenêtres iframe ou des liens externes
-- Les modes Wisp et Bare Server nécessitent un serveur compatible ; GitHub Pages héberge le client mais n'exécute pas le serveur proxy
+- Le mode Wisp nécessite un serveur compatible ; GitHub Pages héberge le client mais n'exécute pas le serveur proxy
 
 ## Licence
 
@@ -166,8 +166,6 @@ a:b Definitive Edition vise à fournir une interface web unique, intuitive et pe
 Version du projet : Final Edition
 Type : Web UI / faux bureau / portail d'applications
 Technologies : HTML, CSS, JavaScript
-
-
 
 
 
